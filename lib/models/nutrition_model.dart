@@ -1,17 +1,16 @@
 import 'dart:math';
 
 class UserProfile {
-  double weight;         
-  double height;         
+  double weight;
+  double height;
   int age;
-  String gender;         
-  double activityFactor; 
-  int caloriesOffset;    
-  String morphotype;     
-
-  // 🆕 Les nouveaux champs pour le mode 100% libre
+  String gender;
+  double activityFactor;
+  int caloriesOffset;
+  String morphotype;
   bool isManualMode;
   int manualTargetCalories;
+  // Macros en mode manuel
   int manualProt;
   int manualCarbs;
   int manualLipids;
@@ -24,14 +23,38 @@ class UserProfile {
     required this.activityFactor,
     required this.caloriesOffset,
     required this.morphotype,
-    this.isManualMode = false, // Désactivé par défaut
+    this.isManualMode = false,
     this.manualTargetCalories = 2500,
-    this.manualProt = 150,
-    this.manualCarbs = 250,
-    this.manualLipids = 80,
+    this.manualProt = 0,
+    this.manualCarbs = 0,
+    this.manualLipids = 0,
   });
 
-  // Calcul du Métabolisme de Base
+  Map<String, dynamic> toFirestore() => {
+        'weight': weight,
+        'height': height,
+        'age': age,
+        'gender': gender,
+        'activityFactor': activityFactor,
+        'caloriesOffset': caloriesOffset,
+        'morphotype': morphotype,
+        'isManualMode': isManualMode,
+        'manualTargetCalories': manualTargetCalories,
+      };
+
+  factory UserProfile.fromFirestore(Map<String, dynamic> data) => UserProfile(
+        weight: (data['weight'] ?? 0.0).toDouble(),
+        height: (data['height'] ?? 0.0).toDouble(),
+        age: data['age'] ?? 20,
+        gender: data['gender'] ?? 'Homme',
+        activityFactor: (data['activityFactor'] ?? 1.2).toDouble(),
+        caloriesOffset: data['caloriesOffset'] ?? 0,
+        morphotype: data['morphotype'] ?? 'Mésomorphe',
+        isManualMode: data['isManualMode'] ?? false,
+        manualTargetCalories: data['manualTargetCalories'] ?? 2500,
+      );
+
+  // ... (Garde tes getters bmr, maintenanceCalories, targetCalories ici)
   double get bmr {
     double heightInMeters = height / 100;
     if (gender == "Homme") {
@@ -44,60 +67,41 @@ class UserProfile {
   }
 
   double get maintenanceCalories => bmr * activityFactor;
-
-  // 🎯 Cible Calorique Intelligente (Choisit le mode automatique OU manuel)
   int get targetCalories {
     if (isManualMode) return manualTargetCalories;
     return (maintenanceCalories + caloriesOffset).round();
   }
 
-  // 🎯 Cible des Macros Intelligente
+  // Retourne les macros cibles (prot, carbs, lipids) en grammes
   Map<String, int> get targetMacros {
     if (isManualMode) {
       return {
-        "proteins": manualProt,
-        "carbs": manualCarbs,
-        "lipids": manualLipids,
+        'proteins': manualProt,
+        'carbs': manualCarbs,
+        'lipids': manualLipids,
       };
     }
 
-    int totalKcal = targetCalories;
-    int proteinGrams = (2 * weight).round();
-    int proteinKcal = proteinGrams * 4;
-    
-    int remainingKcal = totalKcal - proteinKcal;
-    double carbRatio = 0.50;
-    double lipidRatio = 0.30;
-
-    if (morphotype == "Ectomorphe") {
-      carbRatio = 0.60; 
-      lipidRatio = 0.20;
-    } else if (morphotype == "Endomorphe") {
-      carbRatio = 0.40; 
-      lipidRatio = 0.40;
-    }
-
-    int carbGrams = ((remainingKcal * carbRatio) / 4).round();
-    int lipidGrams = ((remainingKcal * lipidRatio) / 9).round();
+    final kcals = targetCalories;
+    // Répartition par défaut : Prot 30% / Glucides 45% / Lipides 25%
+    final protKcal = (kcals * 0.30).round();
+    final carbsKcal = (kcals * 0.45).round();
+    final lipKcal = (kcals * 0.25).round();
 
     return {
-      "proteins": proteinGrams,
-      "carbs": carbGrams,
-      "lipids": lipidGrams,
+      'proteins': (protKcal / 4).round(),
+      'carbs': (carbsKcal / 4).round(),
+      'lipids': (lipKcal / 9).round(),
     };
   }
 }
 
+// Classe simple pour stocker la nutrition du jour
 class DailyNutrition {
   int consumedCalories;
   int proteins;
   int carbs;
   int lipids;
 
-  DailyNutrition({
-    this.consumedCalories = 0,
-    this.proteins = 0,
-    this.carbs = 0,
-    this.lipids = 0,
-  });
+  DailyNutrition({this.consumedCalories = 0, this.proteins = 0, this.carbs = 0, this.lipids = 0});
 }

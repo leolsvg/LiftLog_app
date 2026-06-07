@@ -15,10 +15,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Liste vide au départ
+  final Color bgColor = const Color(0xFF13171C);
+  final Color accentCyan = const Color(0xFF38B6FF);
+
   List<WorkoutSession> _allSessions = [];
-  
-  // Booléen pour gérer le chargement au démarrage
   bool _isLoading = true;
 
   int _selectedSessionIndex = 0;
@@ -30,77 +30,44 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadSavedSessions();
   }
 
-  List<WorkoutSession> _defaultSessions() {
-    return [
-      WorkoutSession(name: "Push Day", exercises: [
-        Exercise.createTarget(name: "Développé Couché", targetSets: 3, targetReps: 10, targetWeight: 80)
-      ]),
-    ];
-  }
-
-  // Fonction pour charger les séances
   Future<void> _loadSavedSessions() async {
-    List<WorkoutSession> loadedSessions = _defaultSessions();
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? sessionsJson = prefs.getString('saved_workout_sessions');
-
-      if (sessionsJson != null && sessionsJson.trim().isNotEmpty) {
-        final dynamic decoded = jsonDecode(sessionsJson);
+    final prefs = await SharedPreferences.getInstance();
+    final String? sessionsJson = prefs.getString('saved_workout_sessions');
+    
+    List<WorkoutSession> loadedSessions = [];
+    if (sessionsJson != null && sessionsJson.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(sessionsJson);
         if (decoded is List) {
-          loadedSessions = decoded
-              .whereType<Map<String, dynamic>>()
-              .map(WorkoutSession.fromJson)
-              .toList();
-        } else {
-          await prefs.remove('saved_workout_sessions');
+          loadedSessions = decoded.whereType<Map<String, dynamic>>().map(WorkoutSession.fromJson).toList();
         }
-      }
-    } catch (_) {
-      loadedSessions = _defaultSessions();
+      } catch (_) { loadedSessions = []; }
     }
-
-    if (!mounted) {
-      return;
-    }
-
+    
+    if (!mounted) return;
     setState(() {
       _allSessions = loadedSessions;
-      _isLoading = false; // Le chargement est terminé
+      _isLoading = false;
     });
   }
 
-  // Fonction pour SAUVEGARDER les séances
   Future<void> _saveSessions() async {
     final prefs = await SharedPreferences.getInstance();
-    final String encoded = jsonEncode(_allSessions.map((e) => e.toJson()).toList());
-    await prefs.setString('saved_workout_sessions', encoded);
+    await prefs.setString('saved_workout_sessions', jsonEncode(_allSessions.map((e) => e.toJson()).toList()));
   }
 
-  // 🗑️ Fonction pour supprimer une séance avec pop-up de confirmation
   void _deleteSessionDialog(int index) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Supprimer le programme ?'),
-        content: Text('Es-tu sûr de vouloir supprimer définitivement "${_allSessions[index].name}" ?'),
+        title: const Text('Supprimer ?'),
+        content: Text('Supprimer "${_allSessions[index].name}" ?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
           ElevatedButton(
             onPressed: () {
-              setState(() {
-                _allSessions.removeAt(index);
-                
-                // Sécurité : si on supprime la séance active ou qu'on dépasse la taille de la liste
-                if (_selectedSessionIndex >= _allSessions.length) {
-                  _selectedSessionIndex = _allSessions.isNotEmpty ? _allSessions.length - 1 : 0;
-                }
-              });
-              _saveSessions(); 
+              setState(() => _allSessions.removeAt(index));
+              _saveSessions();
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red[800]),
@@ -113,23 +80,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showCreateSessionDialog() {
     final titleController = TextEditingController();
-
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Créer une nouvelle séance'),
+        title: const Text('Créer une séance'),
         content: TextField(controller: titleController, decoration: const InputDecoration(labelText: "Nom")),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
           ElevatedButton(
             onPressed: () {
               if (titleController.text.isNotEmpty) {
-                setState(() {
-                  _allSessions.add(WorkoutSession(name: titleController.text, exercises: []));
-                  _selectedSessionIndex = _allSessions.length - 1;
-                  _currentTabRowIndex = 1; 
-                });
-                _saveSessions(); 
+                setState(() => _allSessions.add(WorkoutSession(name: titleController.text, exercises: [])));
+                _saveSessions();
                 Navigator.pop(context);
               }
             },
@@ -142,80 +104,37 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Affiche le chargement uniquement si on n'a pas encore lu la base de données
-    if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    // Détermine le nom de la séance (Sécurité si la liste est complètement vide)
-    final String nextSessionName = _allSessions.isNotEmpty 
-        ? _allSessions[_selectedSessionIndex].name 
-        : "Aucun programme";
+    if (_isLoading) return const Scaffold(backgroundColor: Color(0xFF13171C), body: Center(child: CircularProgressIndicator()));
 
     final List<Widget> tabs = [
       SessionsTab(
         sessions: _allSessions,
-        onLaunchSession: (session) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => WorkoutScreen(
-                session: session,
-                onSessionUpdated: _saveSessions,
-                isEditing: false,
-              ),
-            ),
-          );
-        },
-        onEditSession: (session) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => WorkoutScreen(
-                session: session,
-                onSessionUpdated: _saveSessions,
-                isEditing: true,
-              ),
-            ),
-          );
-        },
-        onDeleteSession: _deleteSessionDialog, // 👈 C'EST ICI QUE ÇA MANQUAIT !
+        onLaunchSession: (s) => Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutScreen(session: s, onSessionUpdated: _saveSessions))),
+        onEditSession: (s) => Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutScreen(session: s, onSessionUpdated: _saveSessions, isEditing: true))),
+        onDeleteSession: _deleteSessionDialog,
         onCreateSession: _showCreateSessionDialog,
       ),
       DashboardTab(
-        nextSessionName: nextSessionName,
+        nextSessionName: _allSessions.isNotEmpty ? _allSessions[_selectedSessionIndex].name : "Aucune",
         onStartSession: () {
-          // Sécurité pour ne rien lancer si tout est supprimé
-          if (_allSessions.isNotEmpty) {
-            final currentSession = _allSessions[_selectedSessionIndex];
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => WorkoutScreen(
-                  session: currentSession,
-                  onSessionUpdated: _saveSessions,
-                  isEditing: false,
-                ),
-              ),
-            );
-          } else {
-            // Petit message si l'utilisateur essaie de lancer sans avoir de séance
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Crée d'abord une séance dans l'onglet 'Séances' !"))
-            );
-          }
+           if (_allSessions.isNotEmpty) {
+             Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutScreen(session: _allSessions[_selectedSessionIndex], onSessionUpdated: _saveSessions)));
+           }
         },
       ),
       const KcalTab(),
     ];
 
     return Scaffold(
-      body: tabs[_currentTabRowIndex],
+      backgroundColor: bgColor,
+      body: SafeArea(child: tabs[_currentTabRowIndex]),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentTabRowIndex,
         onTap: (index) => setState(() => _currentTabRowIndex = index),
-        selectedItemColor: Colors.orangeAccent,
+        backgroundColor: const Color(0xFF1F252D),
+        selectedItemColor: accentCyan,
         unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.list), label: 'Séances'),
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Accueil'),

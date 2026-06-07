@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1084224441677",
+    "project_id": "liftlog-d9e7e",
+    "storage_bucket": "liftlog-d9e7e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1084224441677:android:45077fa307f687f36dfb04",
+        "android_client_info": {
+          "package_name": "com.lrenou.liftlog.v1"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1084224441677-fmikne346n0a4edglg93ucoe0jme7mq0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.lrenou.liftlog.v1",
+            "certificate_hash": "8c1bdcbabf0b548217acdfb77faf210825dadac5"
+          }
+        },
+        {
+          "client_id": "1084224441677-rfk28akdp3l97k0hkcp5mk6ijhc6q4o1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCy1k_pdX_qZ-OrHjb-1MyxXoFsetB5dEw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1084224441677-rfk28akdp3l97k0hkcp5mk6ijhc6q4o1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

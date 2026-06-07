@@ -3,9 +3,9 @@ import '../models/workout_model.dart';
 
 class SessionsTab extends StatelessWidget {
   final List<WorkoutSession> sessions;
-  final Function(WorkoutSession) onLaunchSession; 
-  final Function(WorkoutSession) onEditSession;   
-  final Function(int) onDeleteSession; // 👈 Nouvelle action pour la suppression (via l'index)
+  final Function(WorkoutSession) onLaunchSession;
+  final Function(WorkoutSession) onEditSession;
+  final Function(int) onDeleteSession;
   final VoidCallback onCreateSession;
 
   const SessionsTab({
@@ -13,7 +13,7 @@ class SessionsTab extends StatelessWidget {
     required this.sessions,
     required this.onLaunchSession,
     required this.onEditSession,
-    required this.onDeleteSession, // 👈 Ajout au constructeur
+    required this.onDeleteSession,
     required this.onCreateSession,
   });
 
@@ -73,64 +73,7 @@ class SessionsTab extends StatelessWidget {
               ),
               Expanded(
                 child: sessions.isEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Center(
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(22),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1A1F25),
-                              borderRadius: BorderRadius.circular(22),
-                              border: Border.all(color: Colors.orangeAccent.withOpacity(0.12)),
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 64,
-                                  height: 64,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.05),
-                                    borderRadius: BorderRadius.circular(18),
-                                  ),
-                                  child: const Icon(Icons.event_busy, color: Colors.white70, size: 32),
-                                ),
-                                const SizedBox(height: 16),
-                                const Text(
-                                  'Aucune séance pour le moment',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700),
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Crée ton premier programme pour commencer à t’entraîner.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.white70, height: 1.4),
-                                ),
-                                const SizedBox(height: 20),
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 52,
-                                  child: ElevatedButton.icon(
-                                    onPressed: onCreateSession,
-                                    icon: const Icon(Icons.add),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.white,
-                                      foregroundColor: const Color(0xFF13171C),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                    ),
-                                    label: const Text(
-                                      'Créer un programme',
-                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      )
+                    ? _buildEmpty(context)
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         itemCount: sessions.length,
@@ -261,29 +204,64 @@ class SessionsTab extends StatelessWidget {
       ),
     );
   }
-}
 
-class _InfoChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _InfoChip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: Colors.white70),
-          const SizedBox(width: 6),
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
-        ],
+  Widget _buildEmpty(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Center(
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1F25),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: Colors.orangeAccent.withOpacity(0.12)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Icon(Icons.event_busy, color: Colors.white70, size: 32),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Aucune séance pour le moment',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Crée ton premier programme pour commencer à t’entraîner.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, height: 1.4),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton.icon(
+                  onPressed: onCreateSession,
+                  icon: const Icon(Icons.add),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF13171C),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  label: const Text(
+                    'Créer un programme',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
