@@ -56,6 +56,20 @@ class _KcalTabState extends State<KcalTab> {
   // 🔄 LOGIQUE DE REMISE À ZÉRO ET CHARGEMENT
   Future<void> _loadNutritionData() async {
     final prefs = await SharedPreferences.getInstance();
+
+    _profile.weight = prefs.getDouble('profile_weight') ?? _profile.weight;
+    _profile.height = prefs.getDouble('profile_height') ?? _profile.height;
+    _profile.age = prefs.getInt('profile_age') ?? _profile.age;
+    _profile.gender = prefs.getString('profile_gender') ?? _profile.gender;
+    _profile.activityFactor = prefs.getDouble('profile_activity_factor') ?? _profile.activityFactor;
+    _profile.caloriesOffset = prefs.getInt('profile_calories_offset') ?? _profile.caloriesOffset;
+    _profile.morphotype = prefs.getString('profile_morphotype') ?? _profile.morphotype;
+    _profile.isManualMode = prefs.getBool('profile_is_manual_mode') ?? _profile.isManualMode;
+    _profile.manualTargetCalories = prefs.getInt('profile_manual_target_calories') ?? _profile.manualTargetCalories;
+    _profile.manualProt = prefs.getInt('profile_manual_prot') ?? _profile.manualProt;
+    _profile.manualCarbs = prefs.getInt('profile_manual_carbs') ?? _profile.manualCarbs;
+    _profile.manualLipids = prefs.getInt('profile_manual_lipids') ?? _profile.manualLipids;
+
     final now = DateTime.now();
     final todayString = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
     final savedDate = prefs.getString('last_nutrition_date');
@@ -141,9 +155,202 @@ class _KcalTabState extends State<KcalTab> {
     }
   }
 
+  Future<void> _saveProfileData() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setDouble('profile_weight', _profile.weight);
+    await prefs.setDouble('profile_height', _profile.height);
+    await prefs.setInt('profile_age', _profile.age);
+    await prefs.setString('profile_gender', _profile.gender);
+    await prefs.setDouble('profile_activity_factor', _profile.activityFactor);
+    await prefs.setInt('profile_calories_offset', _profile.caloriesOffset);
+    await prefs.setString('profile_morphotype', _profile.morphotype);
+    await prefs.setBool('profile_is_manual_mode', _profile.isManualMode);
+    await prefs.setInt('profile_manual_target_calories', _profile.manualTargetCalories);
+    await prefs.setInt('profile_manual_prot', _profile.manualProt);
+    await prefs.setInt('profile_manual_carbs', _profile.manualCarbs);
+    await prefs.setInt('profile_manual_lipids', _profile.manualLipids);
+  }
+
   // 🛠️ DIALOGUE PROFIL ET TMB (Inchangé pour raccourcir, garde ton code actuel pour ce bloc)
-  void _showUpdateProfileDialog() {
-    // ... Garde ton code existant ici ...
+  Future<void> _showUpdateProfileDialog() async {
+    final weightController = TextEditingController(text: _profile.weight.toStringAsFixed(1));
+    final heightController = TextEditingController(text: _profile.height.toStringAsFixed(0));
+    final ageController = TextEditingController(text: _profile.age.toString());
+    final offsetController = TextEditingController(text: _profile.caloriesOffset.toString());
+    final manualCaloriesController = TextEditingController(text: _profile.manualTargetCalories.toString());
+    final manualProtController = TextEditingController(text: _profile.manualProt.toString());
+    final manualCarbsController = TextEditingController(text: _profile.manualCarbs.toString());
+    final manualLipidsController = TextEditingController(text: _profile.manualLipids.toString());
+
+    String selectedGender = _profile.gender;
+    String selectedMorphotype = _profile.morphotype;
+    double selectedActivityFactor = _profile.activityFactor;
+    bool isManualMode = _profile.isManualMode;
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Profil nutrition'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: weightController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(labelText: 'Poids (kg)'),
+                    ),
+                    TextField(
+                      controller: heightController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Taille (cm)'),
+                    ),
+                    TextField(
+                      controller: ageController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Âge'),
+                    ),
+                    DropdownButtonFormField<String>(
+                      value: selectedGender,
+                      decoration: const InputDecoration(labelText: 'Sexe'),
+                      items: const [
+                        DropdownMenuItem(value: 'Homme', child: Text('Homme')),
+                        DropdownMenuItem(value: 'Femme', child: Text('Femme')),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setDialogState(() => selectedGender = value);
+                      },
+                    ),
+                    DropdownButtonFormField<double>(
+                      value: selectedActivityFactor,
+                      decoration: const InputDecoration(labelText: 'Activité'),
+                      items: const [
+                        DropdownMenuItem(value: 1.2, child: Text('Sédentaire (1.2)')),
+                        DropdownMenuItem(value: 1.375, child: Text('Légère (1.375)')),
+                        DropdownMenuItem(value: 1.55, child: Text('Modérée (1.55)')),
+                        DropdownMenuItem(value: 1.725, child: Text('Intense (1.725)')),
+                        DropdownMenuItem(value: 1.9, child: Text('Très intense (1.9)')),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setDialogState(() => selectedActivityFactor = value);
+                      },
+                    ),
+                    DropdownButtonFormField<String>(
+                      value: selectedMorphotype,
+                      decoration: const InputDecoration(labelText: 'Morphotype'),
+                      items: const [
+                        DropdownMenuItem(value: 'Mésomorphe', child: Text('Mésomorphe')),
+                        DropdownMenuItem(value: 'Ectomorphe', child: Text('Ectomorphe')),
+                        DropdownMenuItem(value: 'Endomorphe', child: Text('Endomorphe')),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setDialogState(() => selectedMorphotype = value);
+                      },
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Mode manuel'),
+                      value: isManualMode,
+                      onChanged: (value) {
+                        setDialogState(() => isManualMode = value);
+                      },
+                    ),
+                    TextField(
+                      controller: offsetController,
+                      enabled: !isManualMode,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Offset calories'),
+                    ),
+                    TextField(
+                      controller: manualCaloriesController,
+                      enabled: isManualMode,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Calories manuelles'),
+                    ),
+                    TextField(
+                      controller: manualProtController,
+                      enabled: isManualMode,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Protéines manuelles'),
+                    ),
+                    TextField(
+                      controller: manualCarbsController,
+                      enabled: isManualMode,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Glucides manuels'),
+                    ),
+                    TextField(
+                      controller: manualLipidsController,
+                      enabled: isManualMode,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Lipides manuels'),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Annuler'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final parsedWeight = double.tryParse(weightController.text.replaceAll(',', '.'));
+                    final parsedHeight = double.tryParse(heightController.text.replaceAll(',', '.'));
+                    final parsedAge = int.tryParse(ageController.text);
+                    final parsedOffset = int.tryParse(offsetController.text);
+                    final parsedManualCalories = int.tryParse(manualCaloriesController.text);
+                    final parsedManualProt = int.tryParse(manualProtController.text);
+                    final parsedManualCarbs = int.tryParse(manualCarbsController.text);
+                    final parsedManualLipids = int.tryParse(manualLipidsController.text);
+
+                    if (parsedWeight == null || parsedHeight == null || parsedAge == null) {
+                      return;
+                    }
+
+                    setState(() {
+                      _profile.weight = parsedWeight;
+                      _profile.height = parsedHeight;
+                      _profile.age = parsedAge;
+                      _profile.gender = selectedGender;
+                      _profile.activityFactor = selectedActivityFactor;
+                      _profile.morphotype = selectedMorphotype;
+                      _profile.isManualMode = isManualMode;
+                      _profile.caloriesOffset = parsedOffset ?? _profile.caloriesOffset;
+
+                      if (isManualMode) {
+                        _profile.manualTargetCalories = parsedManualCalories ?? _profile.manualTargetCalories;
+                        _profile.manualProt = parsedManualProt ?? _profile.manualProt;
+                        _profile.manualCarbs = parsedManualCarbs ?? _profile.manualCarbs;
+                        _profile.manualLipids = parsedManualLipids ?? _profile.manualLipids;
+                      }
+                    });
+
+                    await _saveProfileData();
+                    await _saveNutritionData();
+                    if (mounted) {
+                      Navigator.pop(dialogContext, true);
+                    }
+                  },
+                  child: const Text('Enregistrer'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (saved == true && mounted) {
+      setState(() {});
+    }
   }
 
   // 🚀 NAVIGATION VERS LE SCANNER 
@@ -191,6 +398,7 @@ class _KcalTabState extends State<KcalTab> {
         centerTitle: false,
         actions: [
           IconButton(
+            tooltip: 'Modifier le profil',
             icon: Icon(Icons.tune, color: textMain),
             onPressed: _showUpdateProfileDialog,
           )

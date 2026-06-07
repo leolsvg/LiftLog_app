@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:simple_barcode_scanner/simple_barcode_scanner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/food_model.dart';
+import 'barcode_scanner_screen.dart';
 
 class AddFoodScreen extends StatefulWidget {
   const AddFoodScreen({super.key});
@@ -14,6 +14,7 @@ class AddFoodScreen extends StatefulWidget {
 
 class _AddFoodScreenState extends State<AddFoodScreen> {
   final TextEditingController _searchController = TextEditingController();
+  static const Duration _searchCacheTtl = Duration(hours: 12);
   
   List<FoodItem> _searchResults = [];
   FoodItem? _selectedFood;
@@ -55,6 +56,70 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     await prefs.setString('saved_custom_meals', jsonEncode(_savedCustomMeals));
   }
 
+  String _cacheKeyForQuery(String query) {
+    final normalized = query.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+    return 'food_search_cache_$normalized';
+  }
+
+  Future<List<FoodItem>?> _loadCachedSearchResults(String query) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_cacheKeyForQuery(query));
+    if (raw == null) return null;
+
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map<String, dynamic>) return null;
+
+    final timestamp = DateTime.tryParse(decoded['timestamp'] as String? ?? '');
+    final items = decoded['items'];
+    if (timestamp == null || DateTime.now().difference(timestamp) > _searchCacheTtl) {
+      await prefs.remove(_cacheKeyForQuery(query));
+      return null;
+    }
+
+    if (items is! List) return null;
+
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(FoodItem.fromCacheJson)
+        .toList();
+  }
+
+  Future<void> _saveCachedSearchResults(String query, List<FoodItem> items) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _cacheKeyForQuery(query),
+      jsonEncode({
+        'timestamp': DateTime.now().toIso8601String(),
+        'items': items.map((item) => item.toJson()).toList(),
+      }),
+    );
+  }
+
+  Future<List<FoodItem>> _fetchFoodsFromOpenFoodFacts(String query, {required String host}) async {
+    final url = Uri.https(host, '/cgi/search.pl', {
+      'search_terms': query,
+      'search_simple': '1',
+      'action': 'process',
+      'json': '1',
+      'page_size': '20',
+      'sort_by': 'popularity',
+      'fields': 'product_name_fr,product_name,nutriments,image_front_small_url',
+    });
+
+    final response = await http.get(url).timeout(const Duration(seconds: 10));
+    if (response.statusCode != 200) {
+      throw Exception('HTTP ${response.statusCode}');
+    }
+
+    final data = jsonDecode(response.body);
+    final products = (data is Map<String, dynamic> ? data['products'] : null) as List<dynamic>?;
+    if (products == null) {
+      throw Exception('Réponse API invalide');
+    }
+
+    return products.map((p) => FoodItem.fromJson(p as Map<String, dynamic>)).toList();
+  }
+
   // 🌍 1. RECHERCHE PAR TEXTE
   Future<void> _searchByText(String query) async {
     if (query.isEmpty) {
@@ -71,29 +136,25 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     });
 
     try {
-      final url = Uri.https('world.openfoodfacts.org', '/cgi/search.pl', {
-        'search_terms': query,
-        'search_simple': '1',
-        'action': 'process',
-        'json': '1',
-        'page_size': '15',
-      });
-      final response = await http.get(url).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode != 200) {
-        throw Exception('HTTP ${response.statusCode}');
+      final cachedResults = await _loadCachedSearchResults(query);
+      if (cachedResults != null && cachedResults.isNotEmpty) {
+        setState(() {
+          _searchResults = cachedResults;
+        });
+        return;
       }
 
-      final data = jsonDecode(response.body);
-      final products = (data is Map<String, dynamic> ? data['products'] : null) as List<dynamic>?;
-
-      if (products == null) {
-        throw Exception('Réponse API invalide');
+      List<FoodItem> results;
+      try {
+        results = await _fetchFoodsFromOpenFoodFacts(query, host: 'world.openfoodfacts.org');
+      } catch (_) {
+        results = await _fetchFoodsFromOpenFoodFacts(query, host: 'fr.openfoodfacts.org');
       }
 
       setState(() {
-        _searchResults = products.map((p) => FoodItem.fromJson(p as Map<String, dynamic>)).toList();
+        _searchResults = results;
       });
+      await _saveCachedSearchResults(query, results);
     } catch (e) {
       _showError("Open Food Facts est temporairement indisponible.");
     } finally {
@@ -106,7 +167,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     var res = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const SimpleBarcodeScannerPage(),
+        builder: (context) => const BarcodeScannerScreen(),
       ),
     );
 
@@ -123,17 +184,30 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     });
 
     try {
-      final url = Uri.https('world.openfoodfacts.org', '/api/v0/product/$barcode.json');
-      final response = await http.get(url).timeout(const Duration(seconds: 10));
-      
-      if (response.statusCode != 200) {
-        throw Exception('HTTP ${response.statusCode}');
+      Map<String, dynamic>? product;
+
+      for (final host in ['world.openfoodfacts.org', 'fr.openfoodfacts.org']) {
+        try {
+          final url = Uri.https(host, '/api/v0/product/$barcode.json');
+          final response = await http.get(url).timeout(const Duration(seconds: 10));
+
+          if (response.statusCode != 200) {
+            throw Exception('HTTP ${response.statusCode}');
+          }
+
+          final data = jsonDecode(response.body);
+          if (data is Map<String, dynamic> && data['status'] == 1) {
+            product = data['product'] as Map<String, dynamic>;
+            break;
+          }
+        } catch (_) {
+          continue;
+        }
       }
 
-      final data = jsonDecode(response.body);
-      if (data is Map<String, dynamic> && data['status'] == 1) { 
+      if (product != null) {
         setState(() {
-          _selectedFood = FoodItem.fromJson(data['product'] as Map<String, dynamic>);
+          _selectedFood = FoodItem.fromJson(product!);
           _currentWeight = 100.0;
         });
       } else {

@@ -15,6 +15,17 @@ class FoodItem {
     this.imageUrl,
   });
 
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'kcalPer100g': kcalPer100g,
+      'protPer100g': protPer100g,
+      'carbsPer100g': carbsPer100g,
+      'lipidsPer100g': lipidsPer100g,
+      'imageUrl': imageUrl,
+    };
+  }
+
   // Traducteur : Convertit les données brutes d'Open Food Facts en un objet FoodItem propre
   factory FoodItem.fromJson(Map<String, dynamic> json) {
     final nutriments = json['nutriments'] ?? {};
@@ -36,6 +47,25 @@ class FoodItem {
       carbsPer100g: parseDouble(nutriments['carbohydrates_100g']),
       lipidsPer100g: parseDouble(nutriments['fat_100g']),
       imageUrl: json['image_front_small_url'],
+    );
+  }
+
+  factory FoodItem.fromCacheJson(Map<String, dynamic> json) {
+    double parseDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+
+    return FoodItem(
+      name: json['name'] as String? ?? 'Produit inconnu',
+      kcalPer100g: parseDouble(json['kcalPer100g']),
+      protPer100g: parseDouble(json['protPer100g']),
+      carbsPer100g: parseDouble(json['carbsPer100g']),
+      lipidsPer100g: parseDouble(json['lipidsPer100g']),
+      imageUrl: json['imageUrl'] as String?,
     );
   }
 
