@@ -6,7 +6,6 @@ plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services")
 }
 
 val keystoreProperties = Properties()
@@ -62,11 +61,4 @@ flutter {
 }
 
 dependencies {
-    // Importe le Firebase BoM (le gestionnaire de versions)
-    implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
-
-    // Ajoute les SDKs dont tu as besoin pour ton application :
-    implementation("com.google.firebase:firebase-analytics")
-    implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.firebase:firebase-firestore")
 }

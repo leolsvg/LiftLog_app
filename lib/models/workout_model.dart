@@ -25,17 +25,33 @@ class WorkoutSet {
 }
 
 class Exercise {
-  final String name;
+  String name; // Retrait de final pour permettre le remplacement en direct
   final List<WorkoutSet> sets;
   final bool isCardio;
+  final List<String> alternatives; // Stocke les noms des exercices de remplacement
 
-  Exercise({required this.name, required this.sets, this.isCardio = false});
+  Exercise({
+    required this.name, 
+    required this.sets, 
+    this.isCardio = false,
+    this.alternatives = const [], // Par défaut, liste vide s'il n'y a pas d'alternative
+  });
 
-  // Helper factory to create a targetted exercise quickly
-  factory Exercise.createTarget({required String name, int targetSets = 3, int targetReps = 8, int targetWeight = 0, int targetDuration = 30, double targetDistance = 0.0, bool isCardio = false}) {
+  // Helper factory mis à jour pour inclure les alternatives à la création si besoin
+  factory Exercise.createTarget({
+    required String name, 
+    int targetSets = 3, 
+    int targetReps = 8, 
+    int targetWeight = 0, 
+    int targetDuration = 30, 
+    double targetDistance = 0.0, 
+    bool isCardio = false,
+    List<String> alternatives = const [],
+  }) {
     return Exercise(
       name: name,
       isCardio: isCardio,
+      alternatives: alternatives,
       sets: List.generate(targetSets, (_) => WorkoutSet(weight: targetWeight, reps: targetReps, duration: targetDuration, distance: targetDistance)),
     );
   }
@@ -43,6 +59,7 @@ class Exercise {
   Map<String, dynamic> toFirestore() => {
         'name': name,
         'isCardio': isCardio,
+        'alternatives': alternatives, // Ajout au mapping pour la base de données
         'sets': sets.map((s) => s.toMap()).toList(),
       };
 
@@ -51,6 +68,7 @@ class Exercise {
   factory Exercise.fromFirestore(Map<String, dynamic> data) => Exercise(
         name: data['name'] ?? 'Exercice',
         isCardio: data['isCardio'] ?? false,
+        alternatives: List<String>.from(data['alternatives'] ?? []), // Récupération propre de la liste
         sets: (data['sets'] as List?)?.map((s) => WorkoutSet.fromMap(s as Map<String, dynamic>)).toList() ?? [],
       );
 

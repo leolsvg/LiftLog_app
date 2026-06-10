@@ -28,13 +28,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   final Color textMain = Colors.white;
   final Color textMuted = const Color(0xFFA0AAB5);
 
-  // Catalogue d'exercices rapides
   final List<String> _exerciseCatalog = [
     "Développé Couché", "Développé Incliné Haltères", "Écartés Poulie", 
-    "Curl Biceps Haltères", "Curl Marteau",
-    "Tractions", "Rowing Barre", "Tirage Poitrine",
-    "Extensions Triceps", "Développé Militaire", "Élévations Latérales",
-    "Squat", "Presse à Cuisses", "Leg Extension", "Crunchs"
+    "Curl Biceps Haltères", "Curl Marteau", "Tractions", "Rowing Barre", 
+    "Tirage Poitrine", "Extensions Triceps", "Développé Militaire", 
+    "Élévations Latérales", "Squat", "Presse à Cuisses", "Leg Extension", "Crunchs"
   ];
 
   final List<String> _cardioCatalog = [
@@ -45,7 +43,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   void initState() {
     super.initState();
     
-    // Remise à zéro des cases cochées si on commence une vraie séance
     if (!widget.isEditing) {
       for (var exercise in widget.session.exercises) {
         for (var set in exercise.sets) {
@@ -58,7 +55,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     _isExpandedList = List.generate(widget.session.exercises.length, (index) => true);
   }
 
-  // 💾 FONCTION POUR VALIDER LA SÉANCE DU JOUR
   Future<void> _finishWorkout() async {
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
@@ -80,7 +76,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         )
       );
-      // Retour à la page précédente (Optionnel)
       Navigator.pop(context);
     }
   }
@@ -94,15 +89,15 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     return Icons.timer;
   }
 
+  // ➕ POP-UP DE CRÉATION (Interface simplifiée : 1 seul exercice secondaire max)
   void _showAddExerciseDialog() {
     final nameController = TextEditingController();
+    final alternativeController = TextEditingController(); 
     
-    // Champs Muscu
     final setsController = TextEditingController(text: "3");
     final repsController = TextEditingController(text: "10");
     final weightController = TextEditingController(text: "60");
 
-    // Champs Cardio
     final durationController = TextEditingController(text: "30");
     final distanceController = TextEditingController(text: "5.0");
 
@@ -120,7 +115,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Sélecteur Muscu / Cardio
                     Row(
                       children: [
                         Expanded(
@@ -160,7 +154,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                           focusNode: focusNode,
                           style: TextStyle(color: textMain),
                           decoration: InputDecoration(
-                            labelText: isCardioSelected ? "Type de cardio" : "Nom de l'exercice", 
+                            labelText: isCardioSelected ? "Exercice principal" : "Exercice principal", 
                             labelStyle: TextStyle(color: textMuted),
                             suffixIcon: Icon(Icons.search, size: 20, color: textMuted)
                           ),
@@ -172,6 +166,18 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                       TextField(controller: setsController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Séries", labelStyle: TextStyle(color: textMuted))),
                       TextField(controller: repsController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Répétitions", labelStyle: TextStyle(color: textMuted))),
                       TextField(controller: weightController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Poids de départ (kg)", labelStyle: TextStyle(color: textMuted))),
+                      const SizedBox(height: 16),
+                      // Option claire pour l'alternative directe
+                      TextField(
+                        controller: alternativeController, 
+                        style: TextStyle(color: textMain), 
+                        decoration: InputDecoration(
+                          labelText: "Exercice secondaire (Optionnel)", 
+                          labelStyle: TextStyle(color: accentCyan.withOpacity(0.8)),
+                          hintText: "Ex: Développé Couché Haltères",
+                          hintStyle: TextStyle(color: textMuted.withOpacity(0.3), fontSize: 13),
+                        ),
+                      ),
                     ] else ...[
                       TextField(controller: durationController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Objectif Temps (min)", labelStyle: TextStyle(color: textMuted))),
                       TextField(controller: distanceController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Objectif Distance (km)", labelStyle: TextStyle(color: textMuted))),
@@ -185,10 +191,15 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                   style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor),
                   onPressed: () {
                     if (nameController.text.isNotEmpty) {
+                      List<String> alts = alternativeController.text.trim().isNotEmpty 
+                          ? [alternativeController.text.trim()] 
+                          : [];
+
                       setState(() {
                         widget.session.exercises.add(Exercise.createTarget(
                           name: nameController.text,
                           isCardio: isCardioSelected,
+                          alternatives: alts, 
                           targetSets: isCardioSelected ? 1 : (int.tryParse(setsController.text) ?? 3),
                           targetReps: int.tryParse(repsController.text) ?? 10,
                           targetWeight: int.tryParse(weightController.text) ?? 60,
@@ -273,16 +284,58 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                                 Icon(_getExerciseIcon(exercise.name, exercise.isCardio), color: allDone ? accentCyan : textMuted),
                                 const SizedBox(width: 12),
                                 Expanded(
-                                  child: Text(
-                                    exercise.name,
-                                    style: TextStyle(
-                                      fontSize: 18, 
-                                      fontWeight: FontWeight.bold, 
-                                      color: allDone ? accentCyan : textMain,
-                                      decoration: allDone ? TextDecoration.lineThrough : null,
-                                    ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        exercise.name,
+                                        style: TextStyle(
+                                          fontSize: 18, 
+                                          fontWeight: FontWeight.bold, 
+                                          color: allDone ? accentCyan : textMain,
+                                          decoration: allDone ? TextDecoration.lineThrough : null,
+                                        ),
+                                      ),
+                                      
+                                      // 🔄 LE BADGE ALTERNATIF RAPIDE : Propre, discret, compréhensible
+                                      if (exercise.alternatives.isNotEmpty && !widget.isEditing && !allDone)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 6.0),
+                                          child: InkWell(
+                                            onTap: () {
+                                              setState(() {
+                                                // On intervertit l'exercice principal et l'alternative d'un seul coup
+                                                final temp = exercise.name;
+                                                exercise.name = exercise.alternatives.first;
+                                                exercise.alternatives[0] = temp;
+                                              });
+                                              widget.onSessionUpdated();
+                                            },
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: accentCyan.withOpacity(0.12),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(color: accentCyan.withOpacity(0.3), width: 1),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.swap_horiz, size: 14, color: accentCyan),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    "Remplacer par : ${exercise.alternatives.first}",
+                                                    style: TextStyle(color: accentCyan, fontSize: 12, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
+                                
                                 if (!widget.isEditing)
                                   Text(
                                     allDone ? 'FAIT ✅' : '$completedSets/$totalSets',
@@ -354,7 +407,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                                               child: Text('${setIndex + 1}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textMuted))
                                             ),
                                             
-                                            // Colonne Poids / Temps
                                             Expanded(
                                               flex: 2,
                                               child: Container(
@@ -379,7 +431,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                                               ),
                                             ),
                                             
-                                            // Colonne Reps / Distance
                                             Expanded(
                                               flex: 2,
                                               child: Container(
@@ -468,8 +519,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 },
               ),
             ),
-          
-          // BOUTON AJOUTER EXERCICE (MODE ÉDITION)
+
           if (widget.isEditing)
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -488,7 +538,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
               ),
             ),
 
-          // BOUTON TERMINER LA SÉANCE (MODE ENTRAÎNEMENT)
           if (!widget.isEditing && session.exercises.isNotEmpty)
             Padding(
               padding: const EdgeInsets.all(16.0),

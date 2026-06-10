@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/weight_chart.dart';
 import '../widgets/consistency_tracker.dart';
-import 'account_screen.dart'; // Import important pour le bouton compte
+import 'account_screen.dart';
 
 class DashboardTab extends StatefulWidget {
   final String nextSessionName;
@@ -26,22 +25,42 @@ class _DashboardTabState extends State<DashboardTab> {
   final Color textMain = Colors.white;
   final Color textMuted = const Color(0xFFA0AAB5);
 
-  final User? user = FirebaseAuth.instance.currentUser;
+  // Instance de l'utilisateur connecté Supabase
+  final User? user = Supabase.instance.client.auth.currentUser;
+  final supabase = Supabase.instance.client;
 
-  Future<void> _saveWeightToFirestore(double weight, double target) async {
+  Future<void> _saveWeightToSupabase(double weight, double target) async {
     if (user == null) return;
-    final docRef = FirebaseFirestore.instance.collection('users').doc(user!.uid);
-    final doc = await docRef.get();
-    List<dynamic> history = doc.exists ? (doc.data() as Map)['weightHistory'] ?? [] : [];
-    
-    history.add(weight);
-    if (history.length > 7) history.removeAt(0);
 
-    await docRef.set({
-      'currentWeight': weight,
-      'targetWeight': target,
-      'weightHistory': history,
-    }, SetOptions(merge: true));
+    try {
+      // 1. Récupérer la ligne existante de l'utilisateur
+      final currentData = await supabase
+          .from('user_profiles')
+          .select('weight_history')
+          .eq('user_id', user!.id)
+          .maybeSingle();
+
+      List<double> history = [];
+      if (currentData != null && currentData['weight_history'] != null) {
+        history = List<double>.from(
+          (currentData['weight_history'] as List).map((e) => (e as num).toDouble()),
+        );
+      }
+
+      // 2. Mettre à jour l'historique (max 7 entrées)
+      history.add(weight);
+      if (history.length > 7) history.removeAt(0);
+
+      // 3. Sauvegarder (upsert écrase ou crée la ligne si elle n'existe pas)
+      await supabase.from('user_profiles').upsert({
+        'user_id': user!.id,
+        'current_weight': weight,
+        'target_weight': target,
+        'weight_history': history,
+      });
+    } catch (e) {
+      debugPrint("Erreur lors de la sauvegarde du poids : $e");
+    }
   }
 
   void _logMorningWeight(double currentWeight, double targetWeight) {
@@ -66,7 +85,7 @@ class _DashboardTabState extends State<DashboardTab> {
             onPressed: () {
               double? w = double.tryParse(weightController.text);
               double? t = double.tryParse(targetController.text);
-              if (w != null) _saveWeightToFirestore(w, t ?? 0.0);
+              if (w != null) _saveWeightToSupabase(w, t ?? 0.0);
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor),
@@ -83,30 +102,34 @@ class _DashboardTabState extends State<DashboardTab> {
       return Scaffold(backgroundColor: bgColor, body: Center(child: Text("Connecte-toi", style: TextStyle(color: textMain))));
     }
 
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').doc(user!.uid).snapshots(),
+    // Utilisation du Stream temps réel de Supabase sur la table user_profiles
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: supabase.from('user_profiles').stream(primaryKey: ['user_id']).eq('user_id', user!.id),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return Scaffold(backgroundColor: bgColor, body: Center(child: CircularProgressIndicator(color: accentCyan)));
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(backgroundColor: bgColor, body: Center(child: CircularProgressIndicator(color: accentCyan)));
+        }
+
+        // Si aucune donnée n'existe encore dans la table pour cet utilisateur, on initialise des valeurs par défaut
+        final data = (snapshot.data != null && snapshot.data!.isNotEmpty) ? snapshot.data!.first : {};
         
-        final data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
-        int consumedKcal = data['consumedKcal'] ?? 0;
-        int consumedProt = data['consumedProt'] ?? 0;
-        int consumedCarbs = data['consumedCarbs'] ?? 0;
-        int consumedLipids = data['consumedLipids'] ?? 0;
-        double currentWeight = (data['currentWeight'] ?? 75.0).toDouble();
-        double targetWeight = (data['targetWeight'] ?? 0.0).toDouble();
-        List<dynamic> weightHistory = data['weightHistory'] ?? [75.0];
+        int consumedKcal = data['consumed_kcal'] ?? 0;
+        int consumedProt = data['consumed_prot'] ?? 0;
+        int consumedCarbs = data['consumed_carbs'] ?? 0;
+        int consumedLipids = data['consumed_lipids'] ?? 0;
+        double currentWeight = (data['current_weight'] ?? 75.0).toDouble();
+        double targetWeight = (data['target_weight'] ?? 0.0).toDouble();
+        List<dynamic> weightHistory = data['weight_history'] ?? [75.0];
 
         return Scaffold(
           backgroundColor: bgColor,
-          // PAS D'APPBAR ICI -> On utilise une SafeArea + un custom Row
           body: SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- CUSTOM HEADER (Remplace l'AppBar) ---
+                  // --- CUSTOM HEADER ---
                   Padding(
                     padding: const EdgeInsets.only(top: 20.0, bottom: 20.0, left: 4.0, right: 4.0),
                     child: Row(
@@ -120,7 +143,7 @@ class _DashboardTabState extends State<DashboardTab> {
                       ],
                     ),
                   ),
-                  // ----------------------------------------
+                  // ---------------------
 
                   // Carte Séance
                   Card(
