@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert'; // 👈 Indispensable pour transformer nos listes en texte pour la sauvegarde
+import 'dart:convert';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/nutrition_model.dart';
 import 'add_food_screen.dart';
+import 'nutrition_setup_screen.dart';
 
 class KcalTab extends StatefulWidget {
   const KcalTab({super.key});
@@ -12,6 +14,8 @@ class KcalTab extends StatefulWidget {
 }
 
 class _KcalTabState extends State<KcalTab> {
+  final _supabase = Supabase.instance.client;
+
   final UserProfile _profile = UserProfile(
     weight: 80.0, 
     height: 180.0, 
@@ -24,7 +28,6 @@ class _KcalTabState extends State<KcalTab> {
   
   final DailyNutrition _todayNutrition = DailyNutrition(consumedCalories: 0, proteins: 0, carbs: 0, lipids: 0);
 
-  // Le compteur total par repas
   final Map<String, int> _mealCalories = {
     "Petit-déjeuner": 0,
     "Déjeuner": 0,
@@ -32,7 +35,6 @@ class _KcalTabState extends State<KcalTab> {
     "Extra / Collation": 0,
   };
 
-  // 🆕 NOUVEAU : Une liste détaillée des aliments pour chaque repas
   final Map<String, List<Map<String, dynamic>>> _mealFoods = {
     "Petit-déjeuner": [],
     "Déjeuner": [],
@@ -40,7 +42,6 @@ class _KcalTabState extends State<KcalTab> {
     "Extra / Collation": [],
   };
 
-  // --- Palette de couleurs (Thème sombre) ---
   final Color bgColor = const Color(0xFF13171C);
   final Color cardColor = const Color(0xFF1F252D);
   final Color accentCyan = const Color(0xFF38B6FF);
@@ -50,26 +51,46 @@ class _KcalTabState extends State<KcalTab> {
   @override
   void initState() {
     super.initState();
-    _loadNutritionData();
+    _syncWithSupabaseAndLocal();
   }
 
-  // 🔄 LOGIQUE DE REMISE À ZÉRO ET CHARGEMENT
+  Future<void> _syncWithSupabaseAndLocal() async {
+    await _loadSupabaseTargets();
+    await _loadNutritionData();
+  }
+
+  Future<void> _loadSupabaseTargets() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final data = await _supabase
+          .from('user_profiles')
+          .select('target_kcal, target_prot, target_carbs, target_lipids, current_weight, height, age, gender')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+      if (data != null) {
+        setState(() {
+          _profile.manualTargetCalories = data['target_kcal'] ?? 2500;
+          _profile.manualProt = data['target_prot'] ?? 150;
+          _profile.manualCarbs = data['target_carbs'] ?? 250;
+          _profile.manualLipids = data['target_lipids'] ?? 80;
+          _profile.isManualMode = true; 
+
+          _profile.weight = (data['current_weight'] ?? _profile.weight).toDouble();
+          _profile.height = (data['height'] ?? _profile.height).toDouble();
+          _profile.age = data['age'] ?? _profile.age;
+          _profile.gender = data['gender'] ?? _profile.gender;
+        });
+      }
+    } catch (e) {
+      debugPrint("Erreur récupération targets Supabase : $e");
+    }
+  }
+
   Future<void> _loadNutritionData() async {
     final prefs = await SharedPreferences.getInstance();
-
-    _profile.weight = prefs.getDouble('profile_weight') ?? _profile.weight;
-    _profile.height = prefs.getDouble('profile_height') ?? _profile.height;
-    _profile.age = prefs.getInt('profile_age') ?? _profile.age;
-    _profile.gender = prefs.getString('profile_gender') ?? _profile.gender;
-    _profile.activityFactor = prefs.getDouble('profile_activity_factor') ?? _profile.activityFactor;
-    _profile.caloriesOffset = prefs.getInt('profile_calories_offset') ?? _profile.caloriesOffset;
-    _profile.morphotype = prefs.getString('profile_morphotype') ?? _profile.morphotype;
-    _profile.isManualMode = prefs.getBool('profile_is_manual_mode') ?? _profile.isManualMode;
-    _profile.manualTargetCalories = prefs.getInt('profile_manual_target_calories') ?? _profile.manualTargetCalories;
-    _profile.manualProt = prefs.getInt('profile_manual_prot') ?? _profile.manualProt;
-    _profile.manualCarbs = prefs.getInt('profile_manual_carbs') ?? _profile.manualCarbs;
-    _profile.manualLipids = prefs.getInt('profile_manual_lipids') ?? _profile.manualLipids;
-
     final now = DateTime.now();
     final todayString = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
     final savedDate = prefs.getString('last_nutrition_date');
@@ -86,54 +107,52 @@ class _KcalTabState extends State<KcalTab> {
         _mealCalories["Dîner"] = prefs.getInt('dinner_kcal') ?? 0;
         _mealCalories["Extra / Collation"] = prefs.getInt('snack_kcal') ?? 0;
 
-        // 🆕 Chargement des listes d'aliments
         for (String meal in _mealFoods.keys) {
           String? foodsJson = prefs.getString('${meal}_foods');
           if (foodsJson != null) {
             List<dynamic> decoded = jsonDecode(foodsJson);
-            _mealFoods[meal] = decoded.map((e) => e as Map<String, dynamic>).toList();
+            _mealFoods[meal] = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
           }
         }
       });
     } else {
       await prefs.setString('last_nutrition_date', todayString);
-      await prefs.setInt('consumed_kcal', 0);
-      await prefs.setInt('consumed_prot', 0);
-      await prefs.setInt('consumed_carbs', 0);
-      await prefs.setInt('consumed_lipids', 0);
-
-      await prefs.setInt('breakfast_kcal', 0);
-      await prefs.setInt('lunch_kcal', 0);
-      await prefs.setInt('dinner_kcal', 0);
-      await prefs.setInt('snack_kcal', 0);
-
-      // 🆕 Suppression des anciennes listes
-      for (String meal in _mealFoods.keys) {
-        await prefs.remove('${meal}_foods');
-      }
-      
-      setState(() {
-        _todayNutrition.consumedCalories = 0;
-        _todayNutrition.proteins = 0;
-        _todayNutrition.carbs = 0;
-        _todayNutrition.lipids = 0;
-
-        _mealCalories["Petit-déjeuner"] = 0;
-        _mealCalories["Déjeuner"] = 0;
-        _mealCalories["Dîner"] = 0;
-        _mealCalories["Extra / Collation"] = 0;
-
-        for (String meal in _mealFoods.keys) {
-          _mealFoods[meal] = [];
-        }
-      });
+      _resetLocalNutrition(prefs);
     }
   }
 
-  // 💾 SAUVEGARDE APRÈS AVOIR AJOUTÉ UN REPAS
+  void _resetLocalNutrition(SharedPreferences prefs) async {
+    await prefs.setInt('consumed_kcal', 0);
+    await prefs.setInt('consumed_prot', 0);
+    await prefs.setInt('consumed_carbs', 0);
+    await prefs.setInt('consumed_lipids', 0);
+    await prefs.setInt('breakfast_kcal', 0);
+    await prefs.setInt('lunch_kcal', 0);
+    await prefs.setInt('dinner_kcal', 0);
+    await prefs.setInt('snack_kcal', 0);
+
+    for (String meal in _mealFoods.keys) {
+      await prefs.remove('${meal}_foods');
+    }
+    
+    setState(() {
+      _todayNutrition.consumedCalories = 0;
+      _todayNutrition.proteins = 0;
+      _todayNutrition.carbs = 0;
+      _todayNutrition.lipids = 0;
+      _mealCalories["Petit-déjeuner"] = 0;
+      _mealCalories["Déjeuner"] = 0;
+      _mealCalories["Dîner"] = 0;
+      _mealCalories["Extra / Collation"] = 0;
+
+      for (String meal in _mealFoods.keys) {
+        _mealFoods[meal] = [];
+      }
+    });
+  }
+
   Future<void> _saveNutritionData() async {
     final prefs = await SharedPreferences.getInstance();
-    
     await prefs.setInt('consumed_kcal', _todayNutrition.consumedCalories);
     await prefs.setInt('consumed_prot', _todayNutrition.proteins);
     await prefs.setInt('consumed_carbs', _todayNutrition.carbs);
@@ -144,239 +163,126 @@ class _KcalTabState extends State<KcalTab> {
     await prefs.setInt('dinner_kcal', _mealCalories["Dîner"]!);
     await prefs.setInt('snack_kcal', _mealCalories["Extra / Collation"]!);
 
-    await prefs.setInt('target_kcal', _profile.targetCalories);
-    await prefs.setInt('target_prot', _profile.targetMacros["proteins"]!);
-    await prefs.setInt('target_carbs', _profile.targetMacros["carbs"]!);
-    await prefs.setInt('target_lipids', _profile.targetMacros["lipids"]!);
-
-    // 🆕 Sauvegarde des listes d'aliments en format Texte (JSON)
     for (String meal in _mealFoods.keys) {
       await prefs.setString('${meal}_foods', jsonEncode(_mealFoods[meal]));
     }
   }
 
-  Future<void> _saveProfileData() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    await prefs.setDouble('profile_weight', _profile.weight);
-    await prefs.setDouble('profile_height', _profile.height);
-    await prefs.setInt('profile_age', _profile.age);
-    await prefs.setString('profile_gender', _profile.gender);
-    await prefs.setDouble('profile_activity_factor', _profile.activityFactor);
-    await prefs.setInt('profile_calories_offset', _profile.caloriesOffset);
-    await prefs.setString('profile_morphotype', _profile.morphotype);
-    await prefs.setBool('profile_is_manual_mode', _profile.isManualMode);
-    await prefs.setInt('profile_manual_target_calories', _profile.manualTargetCalories);
-    await prefs.setInt('profile_manual_prot', _profile.manualProt);
-    await prefs.setInt('profile_manual_carbs', _profile.manualCarbs);
-    await prefs.setInt('profile_manual_lipids', _profile.manualLipids);
-  }
-
-  // 🛠️ DIALOGUE PROFIL ET TMB (Inchangé pour raccourcir, garde ton code actuel pour ce bloc)
-  Future<void> _showUpdateProfileDialog() async {
-    final weightController = TextEditingController(text: _profile.weight.toStringAsFixed(1));
-    final heightController = TextEditingController(text: _profile.height.toStringAsFixed(0));
-    final ageController = TextEditingController(text: _profile.age.toString());
-    final offsetController = TextEditingController(text: _profile.caloriesOffset.toString());
-    final manualCaloriesController = TextEditingController(text: _profile.manualTargetCalories.toString());
-    final manualProtController = TextEditingController(text: _profile.manualProt.toString());
-    final manualCarbsController = TextEditingController(text: _profile.manualCarbs.toString());
-    final manualLipidsController = TextEditingController(text: _profile.manualLipids.toString());
-
-    String selectedGender = _profile.gender;
-    String selectedMorphotype = _profile.morphotype;
-    double selectedActivityFactor = _profile.activityFactor;
-    bool isManualMode = _profile.isManualMode;
-
-    final saved = await showDialog<bool>(
+  // 🛠️ DIALOGUE DE CHOIX : METTRE À JOUR VIA LE CALCULATEUR OU MANUELLEMENT
+  void _showAjustementOptions() {
+    showModalBottomSheet(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Profil nutrition'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: weightController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(labelText: 'Poids (kg)'),
-                    ),
-                    TextField(
-                      controller: heightController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Taille (cm)'),
-                    ),
-                    TextField(
-                      controller: ageController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Âge'),
-                    ),
-                    DropdownButtonFormField<String>(
-                      value: selectedGender,
-                      decoration: const InputDecoration(labelText: 'Sexe'),
-                      items: const [
-                        DropdownMenuItem(value: 'Homme', child: Text('Homme')),
-                        DropdownMenuItem(value: 'Femme', child: Text('Femme')),
-                      ],
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setDialogState(() => selectedGender = value);
-                      },
-                    ),
-                    DropdownButtonFormField<double>(
-                      value: selectedActivityFactor,
-                      decoration: const InputDecoration(labelText: 'Activité'),
-                      items: const [
-                        DropdownMenuItem(value: 1.2, child: Text('Sédentaire (1.2)')),
-                        DropdownMenuItem(value: 1.375, child: Text('Légère (1.375)')),
-                        DropdownMenuItem(value: 1.55, child: Text('Modérée (1.55)')),
-                        DropdownMenuItem(value: 1.725, child: Text('Intense (1.725)')),
-                        DropdownMenuItem(value: 1.9, child: Text('Très intense (1.9)')),
-                      ],
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setDialogState(() => selectedActivityFactor = value);
-                      },
-                    ),
-                    DropdownButtonFormField<String>(
-                      value: selectedMorphotype,
-                      decoration: const InputDecoration(labelText: 'Morphotype'),
-                      items: const [
-                        DropdownMenuItem(value: 'Mésomorphe', child: Text('Mésomorphe')),
-                        DropdownMenuItem(value: 'Ectomorphe', child: Text('Ectomorphe')),
-                        DropdownMenuItem(value: 'Endomorphe', child: Text('Endomorphe')),
-                      ],
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setDialogState(() => selectedMorphotype = value);
-                      },
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Mode manuel'),
-                      value: isManualMode,
-                      onChanged: (value) {
-                        setDialogState(() => isManualMode = value);
-                      },
-                    ),
-                    TextField(
-                      controller: offsetController,
-                      enabled: !isManualMode,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Offset calories'),
-                    ),
-                    TextField(
-                      controller: manualCaloriesController,
-                      enabled: isManualMode,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Calories manuelles'),
-                    ),
-                    TextField(
-                      controller: manualProtController,
-                      enabled: isManualMode,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Protéines manuelles'),
-                    ),
-                    TextField(
-                      controller: manualCarbsController,
-                      enabled: isManualMode,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Glucides manuels'),
-                    ),
-                    TextField(
-                      controller: manualLipidsController,
-                      enabled: isManualMode,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Lipides manuels'),
-                    ),
-                  ],
-                ),
+      backgroundColor: cardColor,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(Icons.auto_awesome, color: accentCyan),
+                title: Text("Calculateur guidé (Objectif de poids)", style: TextStyle(color: textMain, fontWeight: FontWeight.bold)),
+                subtitle: const Text("Formule adaptative étape par étape", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _redirectToWizardSetup();
+                },
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext, false),
-                  child: const Text('Annuler'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final parsedWeight = double.tryParse(weightController.text.replaceAll(',', '.'));
-                    final parsedHeight = double.tryParse(heightController.text.replaceAll(',', '.'));
-                    final parsedAge = int.tryParse(ageController.text);
-                    final parsedOffset = int.tryParse(offsetController.text);
-                    final parsedManualCalories = int.tryParse(manualCaloriesController.text);
-                    final parsedManualProt = int.tryParse(manualProtController.text);
-                    final parsedManualCarbs = int.tryParse(manualCarbsController.text);
-                    final parsedManualLipids = int.tryParse(manualLipidsController.text);
-
-                    if (parsedWeight == null || parsedHeight == null || parsedAge == null) {
-                      return;
-                    }
-
-                    setState(() {
-                      _profile.weight = parsedWeight;
-                      _profile.height = parsedHeight;
-                      _profile.age = parsedAge;
-                      _profile.gender = selectedGender;
-                      _profile.activityFactor = selectedActivityFactor;
-                      _profile.morphotype = selectedMorphotype;
-                      _profile.isManualMode = isManualMode;
-                      _profile.caloriesOffset = parsedOffset ?? _profile.caloriesOffset;
-
-                      if (isManualMode) {
-                        _profile.manualTargetCalories = parsedManualCalories ?? _profile.manualTargetCalories;
-                        _profile.manualProt = parsedManualProt ?? _profile.manualProt;
-                        _profile.manualCarbs = parsedManualCarbs ?? _profile.manualCarbs;
-                        _profile.manualLipids = parsedManualLipids ?? _profile.manualLipids;
-                      }
-                    });
-
-                    await _saveProfileData();
-                    await _saveNutritionData();
-                    if (mounted) {
-                      Navigator.pop(dialogContext, true);
-                    }
-                  },
-                  child: const Text('Enregistrer'),
-                ),
-              ],
-            );
-          },
+              Divider(color: Colors.grey.shade800, height: 1),
+              ListTile(
+                leading: Icon(Icons.edit_note, color: accentCyan),
+                title: Text("Modification manuelle des macros", style: TextStyle(color: textMain, fontWeight: FontWeight.bold)),
+                subtitle: const Text("Rentre tes propres objectifs directement", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showManualEditDialog();
+                },
+              ),
+            ],
+          ),
         );
       },
     );
+  }
 
-    if (saved == true && mounted) {
-      setState(() {});
+  // 📝 DIALOGUE DE MODIFICATION MANUELLE EN DIRECT SUR SUPABASE
+  void _showManualEditDialog() {
+    final kcalController = TextEditingController(text: _profile.targetCalories.toString());
+    final protController = TextEditingController(text: _profile.targetMacros["proteins"].toString());
+    final carbsController = TextEditingController(text: _profile.targetMacros["carbs"].toString());
+    final lipidsController = TextEditingController(text: _profile.targetMacros["lipids"].toString());
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: cardColor,
+        title: Text("Objectifs manuels", style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 18)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: kcalController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Calories cibles (kcal)", labelStyle: TextStyle(color: textMuted))),
+            TextField(controller: protController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Protéines cibles (g)", labelStyle: TextStyle(color: textMuted))),
+            TextField(controller: carbsController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Glucides cibles (g)", labelStyle: TextStyle(color: textMuted))),
+            TextField(controller: lipidsController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Lipides cibles (g)", labelStyle: TextStyle(color: textMuted))),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text("Annuler", style: TextStyle(color: textMuted))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor),
+            onPressed: () async {
+              final user = _supabase.auth.currentUser;
+              if (user == null) return;
+
+              try {
+                await _supabase.from('user_profiles').upsert({
+                  'user_id': user.id,
+                  'target_kcal': int.tryParse(kcalController.text) ?? 2500,
+                  'target_prot': int.tryParse(protController.text) ?? 150,
+                  'target_carbs': int.tryParse(carbsController.text) ?? 250,
+                  'target_lipids': int.tryParse(lipidsController.text) ?? 80,
+                });
+                Navigator.pop(context);
+                _loadSupabaseTargets(); // Recharger le bandeau
+              } catch (e) {
+                debugPrint("Erreur sauvegarde manuelle : $e");
+              }
+            },
+            child: const Text("Enregistrer", style: TextStyle(fontWeight: FontWeight.bold)),
+          )
+        ],
+      ),
+    );
+  }
+
+  Future<void> _redirectToWizardSetup() async {
+    final bool? updated = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const NutritionSetupScreen()),
+    );
+    if (updated == true) {
+      await _loadSupabaseTargets();
     }
   }
 
-  // 🚀 NAVIGATION VERS LE SCANNER 
   void _navigateToAddFood(String mealName) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const AddFoodScreen()),
     );
 
-    // Attention: On vérifie juste `Map` maintenant car les valeurs peuvent être String (le nom) et int (les macros)
     if (result != null && result is Map) {
       int addedKcal = (result['kcal'] ?? 0) as int;
-      String foodName = (result['name'] ?? "Aliment scanné") as String; // 👈 Récupère le nom
+      String foodName = (result['name'] ?? "Aliment scanné") as String;
       
       setState(() {
-        // 1. Ajout au total global
         _todayNutrition.consumedCalories += addedKcal;
         _todayNutrition.proteins += (result['proteins'] ?? 0) as int;
         _todayNutrition.carbs += (result['carbs'] ?? 0) as int;
         _todayNutrition.lipids += (result['lipids'] ?? 0) as int;
 
-        // 2. Ajout au repas spécifique
         if (_mealCalories.containsKey(mealName)) {
           _mealCalories[mealName] = (_mealCalories[mealName] ?? 0) + addedKcal;
-          
-          // 3. 🆕 Ajout à la liste détaillée
           _mealFoods[mealName]!.add({
             'name': foodName,
             'kcal': addedKcal,
@@ -398,9 +304,9 @@ class _KcalTabState extends State<KcalTab> {
         centerTitle: false,
         actions: [
           IconButton(
-            tooltip: 'Modifier le profil',
+            tooltip: 'Ajuster mes objectifs',
             icon: Icon(Icons.tune, color: textMain),
-            onPressed: _showUpdateProfileDialog,
+            onPressed: _showAjustementOptions, // 👈 Ouvre les options : Guidé ou Manuel
           )
         ],
       ),
@@ -415,41 +321,19 @@ class _KcalTabState extends State<KcalTab> {
             Text("Journal du jour", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textMain)),
             const SizedBox(height: 16),
             
-            // 🆕 NOUVEAU : On passe la liste des aliments à chaque widget
-            _buildMealRectangle(
-              title: "Petit-déjeuner", 
-              icon: Icons.free_breakfast_outlined, 
-              kcal: _mealCalories["Petit-déjeuner"]!,
-              foods: _mealFoods["Petit-déjeuner"]!
-            ),
+            _buildMealRectangle(title: "Petit-déjeuner", icon: Icons.free_breakfast_outlined, kcal: _mealCalories["Petit-déjeuner"]!, foods: _mealFoods["Petit-déjeuner"]!),
             const SizedBox(height: 12),
-            _buildMealRectangle(
-              title: "Déjeuner", 
-              icon: Icons.lunch_dining_outlined, 
-              kcal: _mealCalories["Déjeuner"]!,
-              foods: _mealFoods["Déjeuner"]!
-            ),
+            _buildMealRectangle(title: "Déjeuner", icon: Icons.lunch_dining_outlined, kcal: _mealCalories["Déjeuner"]!, foods: _mealFoods["Déjeuner"]!),
             const SizedBox(height: 12),
-            _buildMealRectangle(
-              title: "Dîner", 
-              icon: Icons.dinner_dining_outlined, 
-              kcal: _mealCalories["Dîner"]!,
-              foods: _mealFoods["Dîner"]!
-            ),
+            _buildMealRectangle(title: "Dîner", icon: Icons.dinner_dining_outlined, kcal: _mealCalories["Dîner"]!, foods: _mealFoods["Dîner"]!),
             const SizedBox(height: 12),
-            _buildMealRectangle(
-              title: "Extra / Collation", 
-              icon: Icons.cookie_outlined, 
-              kcal: _mealCalories["Extra / Collation"]!,
-              foods: _mealFoods["Extra / Collation"]!
-            ),
+            _buildMealRectangle(title: "Extra / Collation", icon: Icons.cookie_outlined, kcal: _mealCalories["Extra / Collation"]!, foods: _mealFoods["Extra / Collation"]!),
           ],
         ),
       ),
     );
   }
 
-  // --- WIDGET : Bloc des compteurs du haut (Inchangé) ---
   Widget _buildTopCounters() {
     int target = _profile.targetCalories;
     int eaten = _todayNutrition.consumedCalories;
@@ -461,9 +345,7 @@ class _KcalTabState extends State<KcalTab> {
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Column(
         children: [
@@ -523,17 +405,13 @@ class _KcalTabState extends State<KcalTab> {
     );
   }
 
-  // --- WIDGET : Rectangle pour un repas ---
-  // 🆕 NOUVEAU : On reçoit la liste "foods"
   Widget _buildMealRectangle({required String title, required IconData icon, required int kcal, required List<Map<String, dynamic>> foods}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 2))
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -558,35 +436,21 @@ class _KcalTabState extends State<KcalTab> {
             ],
           ),
           const SizedBox(height: 8),
-          
           Text(
             kcal > 0 ? "$kcal kcal consommées" : "Ajouter des aliments",
-            style: TextStyle(
-              color: kcal > 0 ? accentCyan : textMuted, 
-              fontSize: 14,
-              fontWeight: kcal > 0 ? FontWeight.bold : FontWeight.normal
-            ),
+            style: TextStyle(color: kcal > 0 ? accentCyan : textMuted, fontSize: 14, fontWeight: kcal > 0 ? FontWeight.bold : FontWeight.normal),
           ),
-
-          // 🆕 NOUVEAU : L'affichage de la liste des aliments !
           if (foods.isNotEmpty) ...[
             const SizedBox(height: 12),
             const Divider(color: Colors.white24),
             const SizedBox(height: 8),
-            // On fait une boucle (map) pour afficher chaque aliment
             ...foods.map((food) => Padding(
               padding: const EdgeInsets.only(bottom: 8.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    food['name'], 
-                    style: TextStyle(color: textMain, fontSize: 15)
-                  ),
-                  Text(
-                    "${food['kcal']} kcal", 
-                    style: TextStyle(color: textMuted, fontSize: 14)
-                  ),
+                  Text(food['name'], style: TextStyle(color: textMain, fontSize: 15)),
+                  Text("${food['kcal']} kcal", style: TextStyle(color: textMuted, fontSize: 14)),
                 ],
               ),
             )),

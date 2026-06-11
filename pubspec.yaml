@@ -11,14 +11,16 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  url_launcher: ^6.3.0
   cupertino_icons: ^1.0.8
   http: ^1.6.0
   percent_indicator: ^4.2.5
-  fl_chart: ^0.70.0
   shared_preferences: ^2.2.2
   mobile_scanner: ^7.2.0
   font_awesome_flutter: ^11.0.0
   supabase_flutter: ^2.8.0
+  fl_chart: ^0.69.0
+      
 
 
 dev_dependencies:
