@@ -76,7 +76,7 @@ class _SignupScreenState extends State<SignupScreen> {
     try {
       await _supabase.auth.signInWithOAuth(
         provider,
-        redirectTo: 'myfitnessapp://login-callback',
+        redirectTo: 'com.lrenou.liftlog://login-callback',
         authScreenLaunchMode: LaunchMode.inAppWebView,
       );
     } on AuthException catch (e) {
