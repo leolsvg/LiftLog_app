@@ -74,11 +74,12 @@ class _SignupScreenState extends State<SignupScreen> {
   // Inscription Sociale (Apple)
   Future<void> _handleSocialSignIn(OAuthProvider provider) async {
     try {
-      await _supabase.auth.signInWithOAuth(
-        provider,
+      await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.apple,
         redirectTo: 'com.lrenou.liftlog://login-callback',
-        authScreenLaunchMode: LaunchMode.inAppWebView,
-      );
+        // 🚀 FORCE l'ouverture via le navigateur système externe pour esquiver le bug de cache d'iOS
+        authScreenLaunchProtocol: AuthScreenLaunchProtocol.customTabs,
+);
     } on AuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
