@@ -59,6 +59,44 @@ class _KcalTabState extends State<KcalTab> {
     await _loadNutritionData();
   }
 
+  // 🔄 RECALCULE ET ENVOIE TOUT SUR SUPABASE POUR METTRE À JOUR L'ACCUEIL EN DIRECT
+  Future<void> _syncNutritionToSupabase() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+
+    int totalKcal = 0;
+    int totalProt = 0;
+    int totalCarbs = 0;
+    int totalLipids = 0;
+
+    // Utilisation de ton vrai dictionnaire synchronisé : _mealFoods
+    for (var mealTitle in _mealCalories.keys) {
+      final List<Map<String, dynamic>> foods = _mealFoods[mealTitle] ?? []; 
+      for (var food in foods) {
+        totalKcal += (food['kcal'] ?? 0) as int;
+        totalProt += (food['proteins'] ?? 0) as int;
+        totalCarbs += (food['carbs'] ?? 0) as int;
+        totalLipids += (food['lipids'] ?? 0) as int;
+      }
+    }
+
+    try {
+      await _supabase.from('daily_nutrition').upsert({
+        'user_id': user.id,
+        'date': todayStr,
+        'consumed_kcal': totalKcal,
+        'consumed_prot': totalProt,
+        'consumed_carbs': totalCarbs,
+        'consumed_lipids': totalLipids,
+      });
+      debugPrint("🔥 Dashboard synchronisé avec Supabase !");
+    } catch (e) {
+      debugPrint("❌ Erreur de synchro nutrition : $e");
+    }
+  }
+
   Future<void> _loadSupabaseTargets() async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
@@ -149,6 +187,7 @@ class _KcalTabState extends State<KcalTab> {
         _mealFoods[meal] = [];
       }
     });
+    _syncNutritionToSupabase();
   }
 
   Future<void> _saveNutritionData() async {
@@ -168,7 +207,6 @@ class _KcalTabState extends State<KcalTab> {
     }
   }
 
-  // 🛠️ DIALOGUE DE CHOIX : METTRE À JOUR VIA LE CALCULATEUR OU MANUELLEMENT
   void _showAjustementOptions() {
     showModalBottomSheet(
       context: context,
@@ -205,7 +243,6 @@ class _KcalTabState extends State<KcalTab> {
     );
   }
 
-  // 📝 DIALOGUE DE MODIFICATION MANUELLE EN DIRECT SUR SUPABASE
   void _showManualEditDialog() {
     final kcalController = TextEditingController(text: _profile.targetCalories.toString());
     final protController = TextEditingController(text: _profile.targetMacros["proteins"].toString());
@@ -242,8 +279,8 @@ class _KcalTabState extends State<KcalTab> {
                   'target_carbs': int.tryParse(carbsController.text) ?? 250,
                   'target_lipids': int.tryParse(lipidsController.text) ?? 80,
                 });
-                Navigator.pop(context);
-                _loadSupabaseTargets(); // Recharger le bandeau
+                if (context.mounted) Navigator.pop(context);
+                _loadSupabaseTargets(); 
               } catch (e) {
                 debugPrint("Erreur sauvegarde manuelle : $e");
               }
@@ -286,10 +323,14 @@ class _KcalTabState extends State<KcalTab> {
           _mealFoods[mealName]!.add({
             'name': foodName,
             'kcal': addedKcal,
+            'proteins': (result['proteins'] ?? 0) as int,
+            'carbs': (result['carbs'] ?? 0) as int,
+            'lipids': (result['lipids'] ?? 0) as int,
           });
         }
       });
-      _saveNutritionData();
+      await _saveNutritionData();
+      await _syncNutritionToSupabase(); // 👈 Aligné avec Supabase après l'ajout
     }
   }
 
@@ -306,7 +347,7 @@ class _KcalTabState extends State<KcalTab> {
           IconButton(
             tooltip: 'Ajuster mes objectifs',
             icon: Icon(Icons.tune, color: textMain),
-            onPressed: _showAjustementOptions, // 👈 Ouvre les options : Guidé ou Manuel
+            onPressed: _showAjustementOptions,
           )
         ],
       ),
@@ -444,19 +485,62 @@ class _KcalTabState extends State<KcalTab> {
             const SizedBox(height: 12),
             const Divider(color: Colors.white24),
             const SizedBox(height: 8),
-            ...foods.map((food) => Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(food['name'], style: TextStyle(color: textMain, fontSize: 15)),
-                  Text("${food['kcal']} kcal", style: TextStyle(color: textMuted, fontSize: 14)),
-                ],
-              ),
-            )),
+            ...foods.map((food) {
+              final String foodKey = "${food['name']}_${foods.indexOf(food)}";
+              
+              return Dismissible(
+                key: Key(foodKey),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20.0),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.delete_outline, color: Colors.white, size: 22),
+                ),
+                onDismissed: (direction) {
+                  setState(() {
+                    // 1. Déduire toutes les macros du total global
+                    _todayNutrition.consumedCalories -= (food['kcal'] ?? 0) as int;
+                    _todayNutrition.proteins -= (food['proteins'] ?? 0) as int;
+                    _todayNutrition.carbs -= (food['carbs'] ?? 0) as int;
+                    _todayNutrition.lipids -= (food['lipids'] ?? 0) as int;
+
+                    // 2. Déduire du repas spécifique
+                    _mealCalories[title] = (_mealCalories[title] ?? 0) - (food['kcal'] ?? 0) as int;
+
+                    // 3. Supprimer de la liste locale
+                    foods.remove(food);
+                  });
+                  
+                  _saveNutritionData();
+                  _syncNutritionToSupabase(); // 👈 Aligné avec Supabase après la suppression
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("${food['name']} supprimé"),
+                      backgroundColor: Colors.redAccent,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 4.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(food['name'], style: TextStyle(color: textMain, fontSize: 15)),
+                      Text("${food['kcal']} kcal", style: TextStyle(color: textMuted, fontSize: 14)),
+                    ],
+                  ),
+                ),
+              );
+            }),
           ]
         ],
-      ),
+      ),  
     );
   }
 }

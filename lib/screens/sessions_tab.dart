@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/workout_model.dart';
+import 'history_tab.dart'; // 👈 Importation de l'historique indispensable
 
 class SessionsTab extends StatelessWidget {
   final List<WorkoutSession> sessions;
@@ -30,8 +31,19 @@ class SessionsTab extends StatelessWidget {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 0.2),
         ),
         actions: [
+          // 📜 BOUTON HISTORIQUE (Accès direct depuis les programmes)
+          IconButton(
+            tooltip: 'Voir l’historique des séances',
+            icon: const Icon(Icons.history_rounded, color: Color(0xFF38B6FF), size: 24),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const HistoryTab()),
+              );
+            },
+          ),
           Padding(
-            padding: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.only(right: 16, left: 8),
             child: Center(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

@@ -57,19 +57,21 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // Connexion Sociale (Apple)
-  Future<void> _handleSocialSignIn(OAuthProvider provider) async {
-    try {
-      await _supabase.auth.signInWithOAuth(
-        provider,
-        redirectTo: 'myfitnessapp://login-callback',
-        authScreenLaunchMode: LaunchMode.inAppWebView,
-      );
-    } on AuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
-      );
-    }
+  Future<void> signInWithApple() async {
+  try {
+    await Supabase.instance.client.auth.signInWithOAuth(
+      OAuthProvider.apple,
+      // Cette URL doit matcher le schéma qu'on vient de mettre dans le Info.plist
+      redirectTo: 'com.tonnom.liftlog://login-callback',
+    );
+    
+    // Si pas d'erreur, l'utilisateur est connecté ! Supabase gère la session tout seul.
+    debugPrint("🔥 Connexion Apple réussie !");
+    
+  } catch (e) {
+    debugPrint("❌ Erreur Connexion Apple : $e");
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -155,7 +157,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   text: "Continuer avec Apple",
                   icon: FontAwesomeIcons.apple,
                   iconColor: Colors.white,
-                  onPressed: () => _handleSocialSignIn(OAuthProvider.apple),
+                  onPressed: () => signInWithApple(),
                 ),
 
                 const SizedBox(height: 32),

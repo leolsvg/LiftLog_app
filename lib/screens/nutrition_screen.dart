@@ -293,9 +293,33 @@ class _NutritionScreenState extends State<NutritionScreen> {
                             itemCount: tempIngredients.length,
                             itemBuilder: (context, idx) {
                               final ing = tempIngredients[idx];
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 3.0),
-                                child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text("${ing.name} (${ing.weight}g)", style: TextStyle(color: textMain, fontSize: 13)), Text("${ing.kcal} kcal", style: TextStyle(color: textMuted, fontSize: 13))]),
+                              return Dismissible(
+                                key: UniqueKey(),
+                                direction: DismissDirection.endToStart,
+                                background: Container(
+                                  alignment: Alignment.centerRight,
+                                  padding: const EdgeInsets.only(right: 12.0),
+                                  color: Colors.redAccent.withOpacity(0.2),
+                                  child: const Icon(Icons.remove_circle_outline, color: Colors.redAccent, size: 18),
+                                ),
+                                onDismissed: (direction) {
+                                  // Utilise setDialogState fourni par le StatefulBuilder de la popup
+                                  setDialogState(() {
+                                    tempIngredients.removeAt(idx);
+                                    // Recalcule automatiquement les totaux affichés dans la preview du plat
+                                    recalculateTotals();
+                                  });
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 3.0),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text("${ing.name} (${ing.weight}g)", style: TextStyle(color: textMain, fontSize: 13)),
+                                      Text("${ing.kcal} kcal", style: TextStyle(color: textMuted, fontSize: 13)),
+                                    ],
+                                  ),
+                                ),
                               );
                             },
                           ),

@@ -1,6 +1,10 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // 👈 Indispensable pour copier le modèle dans le presse-papiers
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart'; // <-- Importation essentielle pour ouvrir les liens
+import 'package:url_launcher/url_launcher.dart'; 
+import 'package:file_picker/file_picker.dart'; 
 import 'login_screen.dart';
 
 class AccountScreen extends StatefulWidget {
@@ -27,6 +31,7 @@ class _AccountScreenState extends State<AccountScreen> {
   final _confirmPasswordController = TextEditingController();
 
   bool _isLoading = false;
+  bool _isImporting = false; 
   bool _showEmailFields = false;
   bool _showPasswordFields = false;
 
@@ -49,7 +54,6 @@ class _AccountScreenState extends State<AccountScreen> {
     super.dispose();
   }
 
-  // 🌐 FONCTION MANQUANTE : OUVRIR LES LIENS RGPD
   Future<void> _launchLegalUrl(String urlString) async {
     final Uri url = Uri.parse(urlString);
     try {
@@ -118,6 +122,139 @@ class _AccountScreenState extends State<AccountScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // 📥 PARSER & ENVOI MASSIF DE L'HISTORIQUE DE MUSCULATION
+  Future<void> _importWorkoutHistory() async {
+    if (_user == null) return;
+
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+
+    if (result == null || result.files.single.path == null) return;
+
+    setState(() => _isImporting = true);
+
+    try {
+      File file = File(result.files.single.path!);
+      String content = await file.readAsString();
+      List<dynamic> importedWorkouts = jsonDecode(content);
+
+      for (var session in importedWorkouts) {
+        final workoutResponse = await _supabase.from('workouts').insert({
+          'user_id': _user!.id,
+          'name': session['workout_name'] ?? 'Séance Importée',
+          'duration_minutes': session['duration'] ?? 60,
+          'created_at': session['date'], 
+        }).select('id').single();
+
+        final int workoutId = workoutResponse['id'];
+
+        List<dynamic> sets = session['sets'] ?? [];
+        for (var set in sets) {
+          await _supabase.from('workout_exercises').insert({
+            'workout_id': workoutId,
+            'exercise_name': set['exercise_name'],
+            'set_number': set['set_index'],
+            'weight': (set['weight'] as num).toDouble(),
+            'reps': set['reps'] as int,
+          });
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Historique d'entraînement synchronisé ! 🔥"), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erreur lors du traitement : $e"), backgroundColor: Colors.redAccent),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isImporting = false);
+    }
+  }
+
+  // ℹ️ PANNEAU EXPLICATIF : COMMENT STRUCTURER LE JSON
+  void _showImportInstructions() {
+    const String templateJson = '[\n  {\n    "workout_name": "Push Day",\n    "date": "2026-06-11T18:30:00Z",\n    "duration": 60,\n    "sets": [\n      {\n        "exercise_name": "Développé Couché",\n        "set_index": 1,\n        "weight": 80.0,\n        "reps": 10\n      }\n    ]\n  }\n]';
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cardColor,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          maxChildSize: 0.9,
+          minChildSize: 0.5,
+          expand: false,
+          builder: (context, scrollController) {
+            return SingleChildScrollView(
+              controller: scrollController,
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade700, borderRadius: BorderRadius.circular(10)))),
+                  const SizedBox(height: 20),
+                  Text("Guide de Migration 🚀", style: TextStyle(color: textMain, fontSize: 22, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  _buildStepRow("1", "Crée un fichier texte vide sur ton PC/téléphone et renomme-le en extension .json (ex: historique.json)."),
+                  _buildStepRow("2", "Colle l'historique de tes entraînements en respectant exactement le format requis (modèle ci-dessous)."),
+                  _buildStepRow("3", "Transfère le fichier sur ton téléphone, clique sur la case d'import et sélectionne-le."),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text("STRUCTURE DU FICHIER (.JSON)", style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold)),
+                      TextButton.icon(
+                        icon: Icon(Icons.copy, size: 14, color: accentCyan),
+                        label: Text("Copier le modèle", style: TextStyle(color: accentCyan, fontSize: 13, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          Clipboard.setData(const ClipboardData(text: templateJson));
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Modèle copié dans le presse-papiers ! 📋"), backgroundColor: Colors.grey));
+                        },
+                      )
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white10)),
+                    child: const Text(
+                      templateJson,
+                      style: TextStyle(color: Colors.greenAccent, fontFamily: 'monospace', fontSize: 12, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildStepRow(String number, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(radius: 11, backgroundColor: accentCyan.withOpacity(0.15), child: Text(number, style: TextStyle(color: accentCyan, fontSize: 11, fontWeight: FontWeight.bold))),
+          const SizedBox(width: 12),
+          Expanded(child: Text(text, style: TextStyle(color: textMuted, fontSize: 14, height: 1.3))),
+        ],
+      ),
+    );
   }
 
   Future<void> _updateEmail() async {
@@ -420,7 +557,29 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // --- SECTION 4 : LÉGAL & RGPD ---
+                  // --- SECTION 4 : IMPORTATION DES DONNÉES ---
+                  Text("IMPORTATION DES DONNÉES", style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
+                    child: ListTile(
+                      leading: _isImporting 
+                        ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: accentCyan, strokeWidth: 2))
+                        : Icon(Icons.file_upload_outlined, color: accentCyan),
+                      title: Text("Migrer d'une autre application", style: TextStyle(color: textMain, fontSize: 15, fontWeight: FontWeight.w600)),
+                      subtitle: Text("Importe tes séries et reps (Format JSON)", style: TextStyle(color: textMuted, fontSize: 12)),
+                      // 👈 AJOUT DE LA BULLE INFO D'AIDE SUR LE TRAILING
+                      trailing: IconButton(
+                        icon: Icon(Icons.help_outline, color: accentCyan, size: 20),
+                        onPressed: _showImportInstructions, // Lance le guide de structure
+                      ),
+                      onTap: _isImporting ? null : _importWorkoutHistory,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // --- SECTION 5 : LÉGAL & RGPD ---
                   Text("LÉGAL", style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
                   const SizedBox(height: 8),
                   Container(
@@ -432,7 +591,6 @@ class _AccountScreenState extends State<AccountScreen> {
                           leading: Icon(Icons.gavel_outlined, color: accentCyan, size: 20),
                           title: Text("Mentions Légales", style: TextStyle(color: textMain, fontSize: 14)),
                           trailing: Icon(Icons.open_in_new, color: textMuted, size: 16),
-                          // Modifie les chaînes ci-dessous par tes vraies URLs le moment venu
                           onTap: () => _launchLegalUrl("https://liftlog-privacy.vercel.app"),
                         ),
                         Divider(height: 1, color: bgColor),
@@ -447,7 +605,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // --- SECTION 5 : ACTIONS ---
+                  // --- SECTION 6 : ACTIONS ---
                   Text("ACTIONS", style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
                   const SizedBox(height: 8),
                   InkWell(
@@ -461,13 +619,13 @@ class _AccountScreenState extends State<AccountScreen> {
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: Colors.redAccent.withOpacity(0.2), width: 1)
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Row(
                             children: [
                               Icon(Icons.logout_rounded, color: Colors.redAccent, size: 22),
-                              SizedBox(width: 12),
+                              const SizedBox(width: 12),
                               Text("Se déconnecter", style: TextStyle(color: Colors.redAccent, fontSize: 15, fontWeight: FontWeight.bold)),
                             ],
                           ),
@@ -485,7 +643,7 @@ class _AccountScreenState extends State<AccountScreen> {
                         Text("LiftLog v1.0.0", style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
                         Text(
-                          "Conçu pour soulever lourd et souder du métal.", 
+                          "Conçu pour soulever lourd.", 
                           style: TextStyle(color: textMuted.withOpacity(0.5), fontSize: 11, fontStyle: FontStyle.italic)
                         ),
                       ],

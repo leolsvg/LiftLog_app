@@ -3,7 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/weight_chart.dart';
 import '../widgets/consistency_tracker.dart';
 import 'account_screen.dart';
-import 'nutrition_screen.dart'; // <-- Importation du nouvel écran de nutrition
+import 'history_tab.dart';
+import 'nutrition_screen.dart';
 
 class DashboardTab extends StatefulWidget {
   final String nextSessionName;
@@ -30,37 +31,58 @@ class _DashboardTabState extends State<DashboardTab> {
   final supabase = Supabase.instance.client;
 
   String _averageDurationText = "Calcul...";
+  
+  // États locaux synchronisés pour le profil
+  int _targetKcal = 2500;
+  int _targetProt = 150;
+  int _targetCarbs = 250;
+  int _targetLipids = 80;
+  
+  double _currentWeight = 75.0;
+  double _targetWeight = 80.0;
+  List<double> _weightHistory = [75.0];
 
   @override
   void initState() {
     super.initState();
     _fetchSessionAverageDuration();
+    _loadProfileData();
   }
 
-  @override
-  void didUpdateWidget(covariant DashboardTab oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.nextSessionName != widget.nextSessionName) {
-      _fetchSessionAverageDuration();
+  // 📐 CHARGE TOUTES L'ÉVOLUTION DE PHYSIQUE ET LES CIBLES DEPUIS LE PROFIL UTILISATEUR
+  Future<void> _loadProfileData() async {
+    if (user == null) return;
+    try {
+      // Si ta colonne s'appelle target_gluc au lieu de target_carbs :
+final data = await supabase.from('user_profiles').select('target_kcal, target_prot, target_gluc, target_lipids, current_weight, target_weight, weight_history').eq('user_id', user!.id).maybeSingle();
+      if (data != null && mounted) {
+        setState(() {
+          _targetKcal = data['target_kcal'] ?? 2500;
+          _targetProt = data['target_prot'] ?? 150;
+          _targetCarbs = data['target_gluc'] ?? 250; 
+          _targetLipids = data['target_lipids'] ?? 80;
+          _currentWeight = (data['current_weight'] ?? 75.0).toDouble();
+          _targetWeight = (data['target_weight'] ?? 80.0).toDouble();
+          
+          if (data['weight_history'] != null) {
+            _weightHistory = List<double>.from((data['weight_history'] as List).map((e) => (e as num).toDouble()));
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint("Erreur chargement profil : $e");
     }
   }
 
   Future<void> _fetchSessionAverageDuration() async {
     if (user == null || widget.nextSessionName.isEmpty) return;
-
     try {
-      final response = await supabase
-          .from('workouts')
-          .select('duration_minutes')
-          .eq('user_id', user!.id)
-          .eq('name', widget.nextSessionName);
-
+      final response = await supabase.from('workouts').select('duration_minutes').eq('user_id', user!.id).eq('name', widget.nextSessionName);
       final List<dynamic> data = response as List<dynamic>;
 
       if (data.isNotEmpty) {
         int totalMinutes = 0;
         int count = 0;
-
         for (var row in data) {
           final duration = row['duration_minutes'] as int?;
           if (duration != null && duration > 0) {
@@ -68,7 +90,6 @@ class _DashboardTabState extends State<DashboardTab> {
             count++;
           }
         }
-
         if (mounted) {
           setState(() {
             _averageDurationText = count > 0 
@@ -80,26 +101,17 @@ class _DashboardTabState extends State<DashboardTab> {
         if (mounted) setState(() => _averageDurationText = "Pas encore d'historique");
       }
     } catch (e) {
-      debugPrint("Erreur durée moyenne : $e");
       if (mounted) setState(() => _averageDurationText = "-- min");
     }
   }
 
   Future<void> _saveWeightToSupabase(double weight, double target) async {
     if (user == null) return;
-
     try {
-      final currentData = await supabase
-          .from('user_profiles')
-          .select('weight_history')
-          .eq('user_id', user!.id)
-          .maybeSingle();
-
+      final currentData = await supabase.from('user_profiles').select('weight_history').eq('user_id', user!.id).maybeSingle();
       List<double> history = [];
       if (currentData != null && currentData['weight_history'] != null) {
-        history = List<double>.from(
-          (currentData['weight_history'] as List).map((e) => (e as num).toDouble()),
-        );
+        history = List<double>.from((currentData['weight_history'] as List).map((e) => (e as num).toDouble()));
       }
 
       history.add(weight);
@@ -111,8 +123,11 @@ class _DashboardTabState extends State<DashboardTab> {
         'target_weight': target,
         'weight_history': history,
       });
+      
+      // Force le rafraîchissement local sur l'écran
+      _loadProfileData();
     } catch (e) {
-      debugPrint("Erreur lors de la sauvegarde du poids : $e");
+      debugPrint("Erreur sauvegarde poids : $e");
     }
   }
 
@@ -124,7 +139,7 @@ class _DashboardTabState extends State<DashboardTab> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: cardColor,
-        title: Text('Pesée & Objectif', style: TextStyle(color: textMain)),
+        title: Text('Pesée & Objectif', style: TextStyle(color: textMain, fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -142,7 +157,7 @@ class _DashboardTabState extends State<DashboardTab> {
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor),
-            child: const Text('Enregistrer'),
+            child: const Text('Enregistrer', style: TextStyle(fontWeight: FontWeight.bold)),
           )
         ],
       ),
@@ -155,22 +170,24 @@ class _DashboardTabState extends State<DashboardTab> {
       return Scaffold(backgroundColor: bgColor, body: Center(child: Text("Connecte-toi", style: TextStyle(color: textMain))));
     }
 
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: supabase.from('user_profiles').stream(primaryKey: ['user_id']).eq('user_id', user!.id),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(backgroundColor: bgColor, body: Center(child: CircularProgressIndicator(color: accentCyan)));
-        }
+    final todayStr = DateTime.now().toIso8601String().substring(0, 10);
 
-        final data = (snapshot.data != null && snapshot.data!.isNotEmpty) ? snapshot.data!.first : {};
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: supabase
+          .from('daily_nutrition')
+          .stream(primaryKey: ['id'])
+          .order('date', ascending: false),
+      builder: (context, snapshot) {
+        final rows = snapshot.data ?? [];
+        final nutritionData = rows.firstWhere(
+          (row) => row['user_id'] == user!.id && row['date'] == todayStr,
+          orElse: () => <String, dynamic>{},
+        );
         
-        int consumedKcal = data['consumed_kcal'] ?? 0;
-        int consumedProt = data['consumed_prot'] ?? 0;
-        int consumedCarbs = data['consumed_carbs'] ?? 0;
-        int consumedLipids = data['consumed_lipids'] ?? 0;
-        double currentWeight = (data['current_weight'] ?? 75.0).toDouble();
-        double targetWeight = (data['target_weight'] ?? 0.0).toDouble();
-        List<dynamic> weightHistory = data['weight_history'] ?? [75.0];
+        int consumedKcal = nutritionData['consumed_kcal'] ?? 0;
+        int consumedProt = nutritionData['consumed_prot'] ?? 0;
+        int consumedCarbs = nutritionData['consumed_carbs'] ?? 0;
+        int consumedLipids = nutritionData['consumed_lipids'] ?? 0;
 
         return Scaffold(
           backgroundColor: bgColor,
@@ -189,12 +206,11 @@ class _DashboardTabState extends State<DashboardTab> {
                         Text('Accueil', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: textMain)),
                         IconButton(
                           icon: Icon(Icons.account_circle_outlined, color: textMain, size: 30),
-                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountScreen())),
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountScreen())).then((_) => _loadProfileData()),
                         ),
                       ],
                     ),
                   ),
-                  // ---------------------
 
                   // Carte Séance
                   Card(
@@ -216,10 +232,7 @@ class _DashboardTabState extends State<DashboardTab> {
                                   children: [
                                     Icon(Icons.access_time, size: 14, color: accentCyan.withOpacity(0.8)),
                                     const SizedBox(width: 6),
-                                    Text(
-                                      _averageDurationText, 
-                                      style: TextStyle(color: accentCyan, fontSize: 13, fontWeight: FontWeight.w600)
-                                    ),
+                                    Text(_averageDurationText, style: TextStyle(color: accentCyan, fontSize: 13, fontWeight: FontWeight.w600)),
                                   ],
                                 ),
                               ]
@@ -234,13 +247,13 @@ class _DashboardTabState extends State<DashboardTab> {
                   const ConsistencyTracker(),
                   const SizedBox(height: 32),
                   
-                  // --- NUTRITION DU JOUR (MAINTENANT CLIQUABLE) ---
+                  // --- NUTRITION DU JOUR DYNAMIQUE ---
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Nutrition du jour', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textMain)),
                       TextButton.icon(
-                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NutritionScreen())),
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NutritionScreen())).then((_) => _loadProfileData()),
                         icon: Icon(Icons.restaurant_menu, size: 16, color: accentCyan),
                         label: Text("Plats", style: TextStyle(color: accentCyan, fontSize: 13, fontWeight: FontWeight.bold)),
                       ),
@@ -249,25 +262,21 @@ class _DashboardTabState extends State<DashboardTab> {
                   const SizedBox(height: 8),
                   Card(
                     color: cardColor,
-                    clipBehavior: Clip.antiAlias, // Assure que l'effet InkWell épouse bien les angles de la Card
+                    clipBehavior: Clip.antiAlias,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     child: InkWell(
                       onTap: () {
-                        // Le clic sur le conteneur ouvre la gestion de la nutrition et des plats perso
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const NutritionScreen()),
-                        );
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const NutritionScreen())).then((_) => _loadProfileData());
                       },
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 8.0),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            _buildCircularMacro('Kcal', consumedKcal, 2500, accentCyan),
-                            _buildCircularMacro('Prot', consumedProt, 150, Colors.redAccent.shade200),
-                            _buildCircularMacro('Gluc', consumedCarbs, 250, Colors.greenAccent.shade400),
-                            _buildCircularMacro('Lip', consumedLipids, 80, Colors.orangeAccent.shade200),
+                            _buildCircularMacro('Kcal', consumedKcal, _targetKcal, accentCyan),
+                            _buildCircularMacro('Prot', consumedProt, _targetProt, Colors.redAccent.shade200),
+                            _buildCircularMacro('Gluc', consumedCarbs, _targetCarbs, Colors.greenAccent.shade400),
+                            _buildCircularMacro('Lip', consumedLipids, _targetLipids, Colors.orangeAccent.shade200),
                           ],
                         ),
                       ),
@@ -275,16 +284,44 @@ class _DashboardTabState extends State<DashboardTab> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Poids
+                  // --- SECTION POIDS DE CORPS DYNAMIQUE ---
                   Text('Poids de corps', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textMain)),
                   const SizedBox(height: 12),
-                  Card(color: cardColor, child: Padding(padding: const EdgeInsets.all(20.0), child: Column(children: [
-                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('$currentWeight kg', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: textMain)), if (targetWeight > 0) Text('Objectif : $targetWeight kg', style: TextStyle(color: accentCyan))]),
-                      IconButton(onPressed: () => _logMorningWeight(currentWeight, targetWeight), icon: Icon(Icons.add_circle, color: accentCyan, size: 36)),
-                    ]),
-                    SizedBox(height: 180, child: WeightChart(weightHistory: weightHistory.map((e) => (e as num).toDouble()).toList(), targetWeight: targetWeight)),
-                  ]))),
+                  Card(
+                    color: cardColor, 
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0), 
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween, 
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start, 
+                                children: [
+                                  Text('${_currentWeight.toStringAsFixed(1)} kg', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: textMain)), 
+                                  if (_targetWeight > 0) Text('Objectif : ${_targetWeight.toStringAsFixed(1)} kg', style: TextStyle(color: accentCyan, fontSize: 13, fontWeight: FontWeight.bold))
+                                ]
+                              ),
+                              IconButton(
+                                onPressed: () => _logMorningWeight(_currentWeight, _targetWeight), 
+                                icon: Icon(Icons.add_circle, color: accentCyan, size: 36)
+                              ),
+                            ]
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 180, 
+                            child: WeightChart(
+                              weightHistory: _weightHistory, 
+                              targetWeight: _targetWeight
+                            )
+                          ),
+                        ]
+                      )
+                    )
+                  ),
                   const SizedBox(height: 20),
                 ],
               ),

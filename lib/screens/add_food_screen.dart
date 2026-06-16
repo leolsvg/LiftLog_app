@@ -14,6 +14,7 @@ class AddFoodScreen extends StatefulWidget {
 
 class _AddFoodScreenState extends State<AddFoodScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _weightController = TextEditingController(); // 👈 Controller dédié à la pesée
   static const Duration _searchCacheTtl = Duration(hours: 12);
   
   List<FoodItem> _searchResults = [];
@@ -21,7 +22,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   double _currentWeight = 100.0;
   bool _isLoading = false;
 
-  // 🆕 NOUVEAU : Liste pour stocker les plats complets de l'utilisateur
   List<Map<String, dynamic>> _savedCustomMeals = [];
 
   // --- Palette de couleurs LiftLog (Thème sombre) ---
@@ -31,13 +31,26 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
   final Color textMain = Colors.white;
   final Color textMuted = const Color(0xFFA0AAB5);
 
+  // En-tête strict imposé par la charte d'utilisation de l'API Open Food Facts
+  final Map<String, String> _apiHeaders = {
+    'User-Agent': 'LiftLog - Android - Version 1.1.0 - Contact: developer.leo.cherbourg@gmail.com',
+    'Accept': 'application/json',
+  };
+
   @override
   void initState() {
     super.initState();
-    _loadCustomMeals(); // On charge les plats au démarrage de la page
+    _loadCustomMeals();
+    _weightController.text = _currentWeight.toStringAsFixed(0);
   }
 
-  // 🔄 CHARGEMENT DES PLATS SAUVEGARDÉS
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _weightController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadCustomMeals() async {
     final prefs = await SharedPreferences.getInstance();
     final String? mealsJson = prefs.getString('saved_custom_meals');
@@ -50,7 +63,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     }
   }
 
-  // 💾 SAUVEGARDE DES PLATS
   Future<void> _saveCustomMeals() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('saved_custom_meals', jsonEncode(_savedCustomMeals));
@@ -106,7 +118,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       'fields': 'product_name_fr,product_name,nutriments,image_front_small_url',
     });
 
-    final response = await http.get(url).timeout(const Duration(seconds: 10));
+    // ⚡ Ajout des headers d'authentification utilisateur requis ici
+    final response = await http.get(url, headers: _apiHeaders).timeout(const Duration(seconds: 10));
     if (response.statusCode != 200) {
       throw Exception('HTTP ${response.statusCode}');
     }
@@ -120,7 +133,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     return products.map((p) => FoodItem.fromJson(p as Map<String, dynamic>)).toList();
   }
 
-  // 🌍 1. RECHERCHE PAR TEXTE
   Future<void> _searchByText(String query) async {
     if (query.isEmpty) {
       setState(() {
@@ -162,7 +174,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     }
   }
 
-  // 📷 2. OUVERTURE DE LA CAMÉRA
   Future<void> _scanBarcode() async {
     var res = await Navigator.push(
       context,
@@ -172,11 +183,10 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     );
 
     if (res is String && res != '-1') {
-      _searchByBarcode(res);
+      _searchByBarcode(res.trim());
     }
   }
 
-  // 🌍 3. RECHERCHE PAR CODE BARRES
   Future<void> _searchByBarcode(String barcode) async {
     setState(() {
       _isLoading = true;
@@ -189,7 +199,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       for (final host in ['world.openfoodfacts.org', 'fr.openfoodfacts.org']) {
         try {
           final url = Uri.https(host, '/api/v0/product/$barcode.json');
-          final response = await http.get(url).timeout(const Duration(seconds: 10));
+          // ⚡ Authentification injectée également lors de l'appel au scanner de code-barres
+          final response = await http.get(url, headers: _apiHeaders).timeout(const Duration(seconds: 10));
 
           if (response.statusCode != 200) {
             throw Exception('HTTP ${response.statusCode}');
@@ -209,6 +220,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
         setState(() {
           _selectedFood = FoodItem.fromJson(product!);
           _currentWeight = 100.0;
+          _weightController.text = "100";
         });
       } else {
         _showError("Produit introuvable dans Open Food Facts.");
@@ -224,7 +236,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message, style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red[800]));
   }
 
-  // 🛠️ 4. DIALOGUE POUR CRÉER UN PLAT COMPLET
   void _showCreateMealDialog() {
     final nameController = TextEditingController();
     final kcalController = TextEditingController();
@@ -305,7 +316,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     );
   }
 
-  // 🗑️ SUPPRIMER UN PLAT SAUVEGARDÉ
   void _deleteCustomMeal(int index) {
     setState(() {
       _savedCustomMeals.removeAt(index);
@@ -330,7 +340,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // BARRE DE RECHERCHE & BOUTON SCAN
             Row(
               children: [
                 Expanded(
@@ -348,7 +357,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                             icon: const Icon(Icons.clear, color: Colors.grey),
                             onPressed: () {
                               _searchController.clear();
-                              _searchByText(""); // Réinitialise la vue
+                              _searchByText("");
                             },
                           )
                         : IconButton(
@@ -357,7 +366,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                           ),
                     ),
                     onChanged: (val) {
-                      setState(() {}); // Met à jour l'icône de la croix
+                      setState(() {}); 
                     },
                     onSubmitted: _searchByText,
                   ),
@@ -374,11 +383,9 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
             ),
             const SizedBox(height: 20),
 
-            // CHARGEMENT
             if (_isLoading)
               Center(child: Padding(padding: const EdgeInsets.all(20.0), child: CircularProgressIndicator(color: accentCyan))),
 
-            // 🆕 AFFICHAGE DES PLATS SAUVEGARDÉS (Si on ne cherche rien et qu'on n'a pas sélectionné de produit)
             if (!_isLoading && _searchResults.isEmpty && _selectedFood == null) ...[
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -427,7 +434,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                             onPressed: () => _deleteCustomMeal(index),
                           ),
                           onTap: () {
-                            // On ajoute directement ce plat au journal en fermant l'écran !
                             Navigator.pop(context, meal);
                           },
                         ),
@@ -437,7 +443,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                 ),
             ],
 
-            // RÉSULTATS DE RECHERCHE OPEN FOOD FACTS
             if (!_isLoading && _selectedFood == null && _searchResults.isNotEmpty)
               Expanded(
                 child: ListView.builder(
@@ -457,6 +462,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                         onTap: () {
                           setState(() {
                             _selectedFood = food;
+                            _currentWeight = 100.0;
+                            _weightController.text = "100";
                             _searchResults = []; 
                           });
                         },
@@ -466,7 +473,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                 ),
               ),
 
-            // ALIMENT SÉLECTIONNÉ (Prêt à peser)
             if (_selectedFood != null) ...[
               Card(
                 color: cardColor,
@@ -494,7 +500,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                         children: [
                           Expanded(
                             child: TextField(
-                              controller: TextEditingController(text: _currentWeight.toStringAsFixed(0)),
+                              controller: _weightController, // 👈 Fixé : Utilise le controller persistant
                               keyboardType: TextInputType.number,
                               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textMain),
                               textAlign: TextAlign.center,
