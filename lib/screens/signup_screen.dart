@@ -75,10 +75,10 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _handleSocialSignIn(OAuthProvider provider) async {
     try {
       await Supabase.instance.client.auth.signInWithOAuth(
-        OAuthProvider.apple,
-        redirectTo: 'com.lrenou.liftlog://login-callback',
-        // 🚀 FORCE l'ouverture via le navigateur système externe pour esquiver le bug de cache d'iOS
-        authScreenLaunchProtocol: AuthScreenLaunchProtocol.customTabs,
+  OAuthProvider.apple,
+  redirectTo: 'com.lrenou.liftlog://login-callback',
+  // On utilise les options de flux de Supabase pour forcer le comportement propre
+  launchImagePicker: false, // Juste pour éviter les conflits de dépendances
 );
     } on AuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
