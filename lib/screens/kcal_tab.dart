@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/nutrition_model.dart';
@@ -19,7 +18,7 @@ class _KcalTabState extends State<KcalTab> {
   final UserProfile _profile = UserProfile(
     weight: 80.0, 
     height: 180.0, 
-    age: 19, 
+    age: 20, // Reste calé sur tes données réelles de profil
     gender: "Homme",
     activityFactor: 1.55, 
     caloriesOffset: 300, 
@@ -51,15 +50,15 @@ class _KcalTabState extends State<KcalTab> {
   @override
   void initState() {
     super.initState();
-    _syncWithSupabaseAndLocal();
+    _syncWithSupabase();
   }
 
-  Future<void> _syncWithSupabaseAndLocal() async {
+  Future<void> _syncWithSupabase() async {
     await _loadSupabaseTargets();
-    await _loadNutritionData();
+    await _loadNutritionFromSupabase();
   }
 
-  // 🔄 RECALCULE ET ENVOIE TOUT SUR SUPABASE POUR METTRE À JOUR L'ACCUEIL EN DIRECT
+  // ☁️ ENVOIE TOUT LE JOURNAL ET LES MACROS SUR SUPABASE
   Future<void> _syncNutritionToSupabase() async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
@@ -71,7 +70,6 @@ class _KcalTabState extends State<KcalTab> {
     int totalCarbs = 0;
     int totalLipids = 0;
 
-    // Utilisation de ton vrai dictionnaire synchronisé : _mealFoods
     for (var mealTitle in _mealCalories.keys) {
       final List<Map<String, dynamic>> foods = _mealFoods[mealTitle] ?? []; 
       for (var food in foods) {
@@ -90,8 +88,9 @@ class _KcalTabState extends State<KcalTab> {
         'consumed_prot': totalProt,
         'consumed_carbs': totalCarbs,
         'consumed_lipids': totalLipids,
+        'meals_json': _mealFoods, // 💾 Sauvegarde la structure complète de la journée au format JSON
       });
-      debugPrint("🔥 Dashboard synchronisé avec Supabase !");
+      debugPrint("🔥 Nutrition entièrement sauvegardée sur le Cloud !");
     } catch (e) {
       debugPrint("❌ Erreur de synchro nutrition : $e");
     }
@@ -127,52 +126,55 @@ class _KcalTabState extends State<KcalTab> {
     }
   }
 
-  Future<void> _loadNutritionData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final now = DateTime.now();
-    final todayString = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-    final savedDate = prefs.getString('last_nutrition_date');
+  // ☁️ RÉCUPÈRE LE JOURNAL DEPUIS LE CLOUD TIMÉ SUR AUJOURD'HUI
+  Future<void> _loadNutritionFromSupabase() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
 
-    if (savedDate == todayString) {
-      setState(() {
-        _todayNutrition.consumedCalories = prefs.getInt('consumed_kcal') ?? 0;
-        _todayNutrition.proteins = prefs.getInt('consumed_prot') ?? 0;
-        _todayNutrition.carbs = prefs.getInt('consumed_carbs') ?? 0;
-        _todayNutrition.lipids = prefs.getInt('consumed_lipids') ?? 0;
+    final todayStr = DateTime.now().toIso8601String().substring(0, 10);
 
-        _mealCalories["Petit-déjeuner"] = prefs.getInt('breakfast_kcal') ?? 0;
-        _mealCalories["Déjeuner"] = prefs.getInt('lunch_kcal') ?? 0;
-        _mealCalories["Dîner"] = prefs.getInt('dinner_kcal') ?? 0;
-        _mealCalories["Extra / Collation"] = prefs.getInt('snack_kcal') ?? 0;
+    try {
+      final data = await _supabase
+          .from('daily_nutrition')
+          .select('consumed_kcal, consumed_prot, consumed_carbs, consumed_lipids, meals_json')
+          .eq('user_id', user.id)
+          .eq('date', todayStr)
+          .maybeSingle();
 
-        for (String meal in _mealFoods.keys) {
-          String? foodsJson = prefs.getString('${meal}_foods');
-          if (foodsJson != null) {
-            List<dynamic> decoded = jsonDecode(foodsJson);
-            _mealFoods[meal] = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+      if (data != null) {
+        setState(() {
+          _todayNutrition.consumedCalories = data['consumed_kcal'] ?? 0;
+          _todayNutrition.proteins = data['consumed_prot'] ?? 0;
+          _todayNutrition.carbs = data['consumed_carbs'] ?? 0;
+          _todayNutrition.lipids = data['consumed_lipids'] ?? 0;
+
+          if (data['meals_json'] != null) {
+            final Map<String, dynamic> decodedMeals = data['meals_json'] as Map<String, dynamic>;
+            
+            for (String meal in _mealFoods.keys) {
+              if (decodedMeals.containsKey(meal)) {
+                _mealFoods[meal] = List<Map<String, dynamic>>.from(decodedMeals[meal]);
+                
+                // On recalcule les calories par repas
+                int mealKcal = 0;
+                for (var food in _mealFoods[meal]!) {
+                  mealKcal += (food['kcal'] ?? 0) as int;
+                }
+                _mealCalories[meal] = mealKcal;
+              }
+            }
           }
-        }
-      });
-    } else {
-      await prefs.setString('last_nutrition_date', todayString);
-      _resetLocalNutrition(prefs);
+        });
+      } else {
+        // Si aucune donnée pour aujourd'hui, on initialise une journée propre à 0
+        _resetLocalStateData();
+      }
+    } catch (e) {
+      debugPrint("Erreur de chargement nutrition cloud : $e");
     }
   }
 
-  void _resetLocalNutrition(SharedPreferences prefs) async {
-    await prefs.setInt('consumed_kcal', 0);
-    await prefs.setInt('consumed_prot', 0);
-    await prefs.setInt('consumed_carbs', 0);
-    await prefs.setInt('consumed_lipids', 0);
-    await prefs.setInt('breakfast_kcal', 0);
-    await prefs.setInt('lunch_kcal', 0);
-    await prefs.setInt('dinner_kcal', 0);
-    await prefs.setInt('snack_kcal', 0);
-
-    for (String meal in _mealFoods.keys) {
-      await prefs.remove('${meal}_foods');
-    }
-    
+  void _resetLocalStateData() {
     setState(() {
       _todayNutrition.consumedCalories = 0;
       _todayNutrition.proteins = 0;
@@ -187,24 +189,6 @@ class _KcalTabState extends State<KcalTab> {
         _mealFoods[meal] = [];
       }
     });
-    _syncNutritionToSupabase();
-  }
-
-  Future<void> _saveNutritionData() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('consumed_kcal', _todayNutrition.consumedCalories);
-    await prefs.setInt('consumed_prot', _todayNutrition.proteins);
-    await prefs.setInt('consumed_carbs', _todayNutrition.carbs);
-    await prefs.setInt('consumed_lipids', _todayNutrition.lipids);
-
-    await prefs.setInt('breakfast_kcal', _mealCalories["Petit-déjeuner"]!);
-    await prefs.setInt('lunch_kcal', _mealCalories["Déjeuner"]!);
-    await prefs.setInt('dinner_kcal', _mealCalories["Dîner"]!);
-    await prefs.setInt('snack_kcal', _mealCalories["Extra / Collation"]!);
-
-    for (String meal in _mealFoods.keys) {
-      await prefs.setString('${meal}_foods', jsonEncode(_mealFoods[meal]));
-    }
   }
 
   void _showAjustementOptions() {
@@ -217,7 +201,7 @@ class _KcalTabState extends State<KcalTab> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
+              ListTypeIcon(
                 leading: Icon(Icons.auto_awesome, color: accentCyan),
                 title: Text("Calculateur guidé (Objectif de poids)", style: TextStyle(color: textMain, fontWeight: FontWeight.bold)),
                 subtitle: const Text("Formule adaptative étape par étape", style: TextStyle(color: Colors.grey, fontSize: 12)),
@@ -227,7 +211,7 @@ class _KcalTabState extends State<KcalTab> {
                 },
               ),
               Divider(color: Colors.grey.shade800, height: 1),
-              ListTile(
+              ListTypeIcon(
                 leading: Icon(Icons.edit_note, color: accentCyan),
                 title: Text("Modification manuelle des macros", style: TextStyle(color: textMain, fontWeight: FontWeight.bold)),
                 subtitle: const Text("Rentre tes propres objectifs directement", style: TextStyle(color: Colors.grey, fontSize: 12)),
@@ -329,8 +313,7 @@ class _KcalTabState extends State<KcalTab> {
           });
         }
       });
-      await _saveNutritionData();
-      await _syncNutritionToSupabase(); // 👈 Aligné avec Supabase après l'ajout
+      await _syncNutritionToSupabase(); 
     }
   }
 
@@ -502,21 +485,16 @@ class _KcalTabState extends State<KcalTab> {
                 ),
                 onDismissed: (direction) {
                   setState(() {
-                    // 1. Déduire toutes les macros du total global
                     _todayNutrition.consumedCalories -= (food['kcal'] ?? 0) as int;
                     _todayNutrition.proteins -= (food['proteins'] ?? 0) as int;
                     _todayNutrition.carbs -= (food['carbs'] ?? 0) as int;
                     _todayNutrition.lipids -= (food['lipids'] ?? 0) as int;
 
-                    // 2. Déduire du repas spécifique
                     _mealCalories[title] = (_mealCalories[title] ?? 0) - (food['kcal'] ?? 0) as int;
-
-                    // 3. Supprimer de la liste locale
                     foods.remove(food);
                   });
                   
-                  _saveNutritionData();
-                  _syncNutritionToSupabase(); // 👈 Aligné avec Supabase après la suppression
+                  _syncNutritionToSupabase(); // Aligné directement en ligne après suppression
 
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -542,5 +520,20 @@ class _KcalTabState extends State<KcalTab> {
         ],
       ),  
     );
+  }
+}
+
+// Remplacement temporaire pour compilation propre si besoin
+class ListTypeIcon extends StatelessWidget {
+  final Widget leading;
+  final Widget title;
+  final Widget subtitle;
+  final VoidCallback onTap;
+
+  const ListTypeIcon({super.key, required this.leading, required this.title, required this.subtitle, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(leading: leading, title: title, subtitle: subtitle, onTap: onTap);
   }
 }

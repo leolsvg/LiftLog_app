@@ -1,11 +1,11 @@
 import 'dart:convert'; 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/workout_model.dart';
 import 'workout_screen.dart';
 import 'sessions_tab.dart';
-import 'kcal_tab.dart';
 import 'dashboard_tab.dart';
+import 'evolution_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,7 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
 
   int _selectedSessionIndex = 0;
-  int _currentTabRowIndex = 1;
+  int _currentTabRowIndex = 1; // Par défaut sur l'Accueil
 
   @override
   void initState() {
@@ -31,44 +31,76 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadSavedSessions() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? sessionsJson = prefs.getString('saved_workout_sessions');
-    
-    List<WorkoutSession> loadedSessions = [];
-    if (sessionsJson != null && sessionsJson.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(sessionsJson);
-        if (decoded is List) {
-          loadedSessions = decoded.whereType<Map<String, dynamic>>().map(WorkoutSession.fromJson).toList();
-        }
-      } catch (_) { loadedSessions = []; }
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
     }
-    
-    if (!mounted) return;
-    setState(() {
-      _allSessions = loadedSessions;
-      _isLoading = false;
-    });
+
+    try {
+      final List<dynamic> data = await Supabase.instance.client
+          .from('workout_templates')
+          .select('name, exercises')
+          .eq('user_id', user.id);
+
+      List<WorkoutSession> loadedSessions = data.map((json) {
+        return WorkoutSession(
+          name: json['name'] ?? 'Programme',
+          exercises: (json['exercises'] as List?)
+                  ?.map((e) => Exercise.fromJson(e as Map<String, dynamic>))
+                  .toList() ?? [],
+        );
+      }).toList();
+
+      if (!mounted) return;
+      setState(() {
+        _allSessions = loadedSessions;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint("Erreur lors de la récupération cloud : $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  Future<void> _saveSessions() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('saved_workout_sessions', jsonEncode(_allSessions.map((e) => e.toJson()).toList()));
+  Future<void> _syncSessionsToSupabase() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await Supabase.instance.client
+          .from('workout_templates')
+          .delete()
+          .eq('user_id', user.id);
+
+      if (_allSessions.isNotEmpty) {
+        final templatesToInsert = _allSessions.map((session) => {
+          'user_id': user.id,
+          'name': session.name,
+          'exercises': session.exercises.map((e) => e.toJson()).toList(),
+        }).toList();
+
+        await Supabase.instance.client.from('workout_templates').insert(templatesToInsert);
+      }
+    } catch (e) {
+      debugPrint("Erreur de synchronisation cloud : $e");
+    }
   }
 
   void _deleteSessionDialog(int index) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Supprimer ?'),
-        content: Text('Supprimer "${_allSessions[index].name}" ?'),
+        backgroundColor: const Color(0xFF1F252D),
+        title: const Text('Supprimer ?', style: TextStyle(color: Colors.white)),
+        content: Text('Supprimer "${_allSessions[index].name}" ?', style: const TextStyle(color: Colors.white70)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler', style: TextStyle(color: Colors.grey))),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               setState(() => _allSessions.removeAt(index));
-              _saveSessions();
               Navigator.pop(context);
+              await _syncSessionsToSupabase();
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red[800]),
             child: const Text('Supprimer'),
@@ -83,19 +115,25 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Créer une séance'),
-        content: TextField(controller: titleController, decoration: const InputDecoration(labelText: "Nom")),
+        backgroundColor: const Color(0xFF1F252D),
+        title: const Text('Créer une séance', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: titleController, 
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(labelText: "Nom", labelStyle: TextStyle(color: Colors.grey)),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler', style: TextStyle(color: Colors.grey))),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (titleController.text.isNotEmpty) {
                 setState(() => _allSessions.add(WorkoutSession(name: titleController.text, exercises: [])));
-                _saveSessions();
                 Navigator.pop(context);
+                await _syncSessionsToSupabase();
               }
             },
-            child: const Text('Créer'),
+            style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor),
+            child: const Text('Créer', style: TextStyle(fontWeight: FontWeight.bold)),
           )
         ],
       ),
@@ -104,13 +142,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Scaffold(backgroundColor: Color(0xFF13171C), body: Center(child: CircularProgressIndicator()));
+    if (_isLoading) return Scaffold(backgroundColor: bgColor, body: const Center(child: CircularProgressIndicator(color: Color(0xFF38B6FF))));
 
     final List<Widget> tabs = [
       SessionsTab(
         sessions: _allSessions,
-        onLaunchSession: (s) => Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutScreen(session: s, onSessionUpdated: _saveSessions))),
-        onEditSession: (s) => Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutScreen(session: s, onSessionUpdated: _saveSessions, isEditing: true))),
+        onLaunchSession: (s) => Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutScreen(session: s, onSessionUpdated: _syncSessionsToSupabase))),
+        onEditSession: (s) => Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutScreen(session: s, onSessionUpdated: _syncSessionsToSupabase, isEditing: true))),
         onDeleteSession: _deleteSessionDialog,
         onCreateSession: _showCreateSessionDialog,
       ),
@@ -118,11 +156,11 @@ class _HomeScreenState extends State<HomeScreen> {
         nextSessionName: _allSessions.isNotEmpty ? _allSessions[_selectedSessionIndex].name : "Aucune",
         onStartSession: () {
            if (_allSessions.isNotEmpty) {
-             Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutScreen(session: _allSessions[_selectedSessionIndex], onSessionUpdated: _saveSessions)));
+             Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutScreen(session: _allSessions[_selectedSessionIndex], onSessionUpdated: _syncSessionsToSupabase)));
            }
         },
       ),
-      const KcalTab(),
+      const EvolutionTab(), // Regroupe Calories, Mensurations et Photos
     ];
 
     return Scaffold(
@@ -136,9 +174,9 @@ class _HomeScreenState extends State<HomeScreen> {
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.list), label: 'Séances'),
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Accueil'),
-          BottomNavigationBarItem(icon: Icon(Icons.local_fire_department), label: 'Kcal'),
+          BottomNavigationBarItem(icon: Icon(Icons.fitness_center), label: 'Séances'),
+          BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: 'Accueil'),
+          BottomNavigationBarItem(icon: Icon(Icons.analytics_outlined), label: 'Suivi'),
         ],
       ),
     );

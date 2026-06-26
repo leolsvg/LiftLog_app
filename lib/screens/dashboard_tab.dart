@@ -4,7 +4,6 @@ import '../widgets/weight_chart.dart';
 import '../widgets/consistency_tracker.dart';
 import 'account_screen.dart';
 import 'history_tab.dart';
-import 'nutrition_screen.dart';
 
 class DashboardTab extends StatefulWidget {
   final String nextSessionName;
@@ -21,6 +20,7 @@ class DashboardTab extends StatefulWidget {
 }
 
 class _DashboardTabState extends State<DashboardTab> {
+  // Styles & Palette Signatures
   final Color bgColor = const Color(0xFF13171C);
   final Color cardColor = const Color(0xFF1F252D);
   final Color accentCyan = const Color(0xFF38B6FF);
@@ -31,12 +31,19 @@ class _DashboardTabState extends State<DashboardTab> {
   final supabase = Supabase.instance.client;
 
   String _averageDurationText = "Calcul...";
+  bool _isLoading = true;
   
-  // États locaux synchronisés pour le profil
+  // Objectifs cibles (user_profiles)
   int _targetKcal = 2500;
   int _targetProt = 150;
   int _targetCarbs = 250;
   int _targetLipids = 80;
+  
+  // Consommation réelle du jour (daily_nutrition) connectée
+  int _consumedKcal = 0;
+  int _consumedProt = 0;
+  int _consumedCarbs = 0;
+  int _consumedLipids = 0;
   
   double _currentWeight = 75.0;
   double _targetWeight = 80.0;
@@ -46,15 +53,27 @@ class _DashboardTabState extends State<DashboardTab> {
   void initState() {
     super.initState();
     _fetchSessionAverageDuration();
-    _loadProfileData();
+    _loadAllData();
   }
 
-  // 📐 CHARGE TOUTES L'ÉVOLUTION DE PHYSIQUE ET LES CIBLES DEPUIS LE PROFIL UTILISATEUR
+  Future<void> _loadAllData() async {
+    setState(() => _isLoading = true);
+    await _loadProfileData();
+    await _loadNutritionData();
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _loadProfileData() async {
     if (user == null) return;
     try {
-      // Si ta colonne s'appelle target_gluc au lieu de target_carbs :
-final data = await supabase.from('user_profiles').select('target_kcal, target_prot, target_gluc, target_lipids, current_weight, target_weight, weight_history').eq('user_id', user!.id).maybeSingle();
+      final data = await supabase
+          .from('user_profiles')
+          .select('target_kcal, target_prot, target_gluc, target_lipids, current_weight, target_weight, weight_history')
+          .eq('user_id', user!.id)
+          .maybeSingle();
+          
       if (data != null && mounted) {
         setState(() {
           _targetKcal = data['target_kcal'] ?? 2500;
@@ -74,10 +93,45 @@ final data = await supabase.from('user_profiles').select('target_kcal, target_pr
     }
   }
 
+  Future<void> _loadNutritionData() async {
+    if (user == null) return;
+    try {
+      final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+      final data = await supabase
+          .from('daily_nutrition')
+          .select('consumed_kcal, consumed_prot, consumed_carbs, consumed_lipids')
+          .eq('user_id', user!.id)
+          .eq('date', todayStr)
+          .maybeSingle();
+
+      if (data != null && mounted) {
+        setState(() {
+          _consumedKcal = data['consumed_kcal'] ?? 0;
+          _consumedProt = data['consumed_prot'] ?? 0;
+          _consumedCarbs = data['consumed_carbs'] ?? 0;
+          _consumedLipids = data['consumed_lipids'] ?? 0;
+        });
+      } else {
+        setState(() {
+          _consumedKcal = 0;
+          _consumedProt = 0;
+          _consumedCarbs = 0;
+          _consumedLipids = 0;
+        });
+      }
+    } catch (e) {
+      debugPrint("Erreur chargement nutrition du jour : $e");
+    }
+  }
+
   Future<void> _fetchSessionAverageDuration() async {
     if (user == null || widget.nextSessionName.isEmpty) return;
     try {
-      final response = await supabase.from('workouts').select('duration_minutes').eq('user_id', user!.id).eq('name', widget.nextSessionName);
+      final response = await supabase
+          .from('workouts')
+          .select('duration_minutes')
+          .eq('user_id', user!.id)
+          .eq('name', widget.nextSessionName);
       final List<dynamic> data = response as List<dynamic>;
 
       if (data.isNotEmpty) {
@@ -93,12 +147,12 @@ final data = await supabase.from('user_profiles').select('target_kcal, target_pr
         if (mounted) {
           setState(() {
             _averageDurationText = count > 0 
-                ? "Durée moyenne : ${(totalMinutes / count).toStringAsFixed(0)} min"
+                ? "${(totalMinutes / count).toStringAsFixed(0)} min en moyenne"
                 : "Première fois pour cette séance !";
           });
         }
       } else {
-        if (mounted) setState(() => _averageDurationText = "Pas encore d'historique");
+        if (mounted) setState(() => _averageDurationText = "Nouvel entraînement");
       }
     } catch (e) {
       if (mounted) setState(() => _averageDurationText = "-- min");
@@ -124,8 +178,7 @@ final data = await supabase.from('user_profiles').select('target_kcal, target_pr
         'weight_history': history,
       });
       
-      // Force le rafraîchissement local sur l'écran
-      _loadProfileData();
+      _loadAllData();
     } catch (e) {
       debugPrint("Erreur sauvegarde poids : $e");
     }
@@ -139,12 +192,13 @@ final data = await supabase.from('user_profiles').select('target_kcal, target_pr
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: cardColor,
-        title: Text('Pesée & Objectif', style: TextStyle(color: textMain, fontWeight: FontWeight.bold)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Nouvelle pesée', style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 18)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: weightController, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: TextStyle(color: textMain), decoration: InputDecoration(labelText: 'Poids du jour (kg)', labelStyle: TextStyle(color: textMuted))),
-            TextField(controller: targetController, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: TextStyle(color: textMain), decoration: InputDecoration(labelText: 'Objectif (kg)', labelStyle: TextStyle(color: textMuted))),
+            TextField(controller: weightController, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: TextStyle(color: textMain), decoration: InputDecoration(labelText: 'Poids actuel (kg)', labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)))),
+            TextField(controller: targetController, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: TextStyle(color: textMain), decoration: InputDecoration(labelText: 'Objectif final (kg)', labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)))),
           ],
         ),
         actions: [
@@ -156,8 +210,8 @@ final data = await supabase.from('user_profiles').select('target_kcal, target_pr
               if (w != null) _saveWeightToSupabase(w, t ?? 0.0);
               Navigator.pop(context);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor),
-            child: const Text('Enregistrer', style: TextStyle(fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+            child: const Text('Confirmer', style: TextStyle(fontWeight: FontWeight.bold)),
           )
         ],
       ),
@@ -167,181 +221,201 @@ final data = await supabase.from('user_profiles').select('target_kcal, target_pr
   @override
   Widget build(BuildContext context) {
     if (user == null) {
-      return Scaffold(backgroundColor: bgColor, body: Center(child: Text("Connecte-toi", style: TextStyle(color: textMain))));
+      return Scaffold(backgroundColor: bgColor, body: Center(child: Text("Authentification requise", style: TextStyle(color: textMain))));
     }
 
-    final todayStr = DateTime.now().toIso8601String().substring(0, 10);
-
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: supabase
-          .from('daily_nutrition')
-          .stream(primaryKey: ['id'])
-          .order('date', ascending: false),
-      builder: (context, snapshot) {
-        final rows = snapshot.data ?? [];
-        final nutritionData = rows.firstWhere(
-          (row) => row['user_id'] == user!.id && row['date'] == todayStr,
-          orElse: () => <String, dynamic>{},
-        );
-        
-        int consumedKcal = nutritionData['consumed_kcal'] ?? 0;
-        int consumedProt = nutritionData['consumed_prot'] ?? 0;
-        int consumedCarbs = nutritionData['consumed_carbs'] ?? 0;
-        int consumedLipids = nutritionData['consumed_lipids'] ?? 0;
-
-        return Scaffold(
-          backgroundColor: bgColor,
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // --- CUSTOM HEADER ---
-                  Padding(
-                    padding: const EdgeInsets.only(top: 20.0, bottom: 20.0, left: 4.0, right: 4.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Accueil', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: textMain)),
-                        IconButton(
-                          icon: Icon(Icons.account_circle_outlined, color: textMain, size: 30),
-                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountScreen())).then((_) => _loadProfileData()),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Carte Séance
-                  Card(
-                    color: cardColor,
-                    shape: RoundedRectangleBorder(side: BorderSide(color: accentCyan, width: 1.5), borderRadius: BorderRadius.circular(16)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Entraînement', style: TextStyle(color: textMuted)), 
-                                const SizedBox(height: 4), 
-                                Text(widget.nextSessionName, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textMain)),
-                                const SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    Icon(Icons.access_time, size: 14, color: accentCyan.withOpacity(0.8)),
-                                    const SizedBox(width: 6),
-                                    Text(_averageDurationText, style: TextStyle(color: accentCyan, fontSize: 13, fontWeight: FontWeight.w600)),
-                                  ],
-                                ),
-                              ]
-                            )
-                          ),
-                          ElevatedButton(onPressed: widget.onStartSession, style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor), child: const Text('Lancer')),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  const ConsistencyTracker(),
-                  const SizedBox(height: 32),
-                  
-                  // --- NUTRITION DU JOUR DYNAMIQUE ---
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Scaffold(
+      backgroundColor: bgColor,
+      body: SafeArea(
+        child: _isLoading 
+            ? Center(child: CircularProgressIndicator(color: accentCyan, strokeWidth: 2))
+            : RefreshIndicator(
+                color: accentCyan,
+                backgroundColor: cardColor,
+                onRefresh: _loadAllData,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Nutrition du jour', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textMain)),
-                      TextButton.icon(
-                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NutritionScreen())).then((_) => _loadProfileData()),
-                        icon: Icon(Icons.restaurant_menu, size: 16, color: accentCyan),
-                        label: Text("Plats", style: TextStyle(color: accentCyan, fontSize: 13, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Card(
-                    color: cardColor,
-                    clipBehavior: Clip.antiAlias,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: InkWell(
-                      onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const NutritionScreen())).then((_) => _loadProfileData());
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 8.0),
+                      // --- HEADER ---
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 24.0, top: 10.0),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            _buildCircularMacro('Kcal', consumedKcal, _targetKcal, accentCyan),
-                            _buildCircularMacro('Prot', consumedProt, _targetProt, Colors.redAccent.shade200),
-                            _buildCircularMacro('Gluc', consumedCarbs, _targetCarbs, Colors.greenAccent.shade400),
-                            _buildCircularMacro('Lip', consumedLipids, _targetLipids, Colors.orangeAccent.shade200),
+                            Text('Accueil', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: textMain, letterSpacing: -0.5)),
+                            IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              icon: Icon(Icons.account_circle_outlined, color: textMuted, size: 26),
+                              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountScreen())).then((_) => _loadAllData()),
+                            ),
                           ],
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
 
-                  // --- SECTION POIDS DE CORPS DYNAMIQUE ---
-                  Text('Poids de corps', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textMain)),
-                  const SizedBox(height: 12),
-                  Card(
-                    color: cardColor, 
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0), 
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween, 
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start, 
+                      // --- SÉANCE DU JOUR ---
+                      Container(
+                        padding: const EdgeInsets.all(20.0),
+                        decoration: BoxDecoration(
+                          color: cardColor,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: accentCyan.withOpacity(0.25), width: 1),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('${_currentWeight.toStringAsFixed(1)} kg', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: textMain)), 
-                                  if (_targetWeight > 0) Text('Objectif : ${_targetWeight.toStringAsFixed(1)} kg', style: TextStyle(color: accentCyan, fontSize: 13, fontWeight: FontWeight.bold))
-                                ]
+                                  Text('PROCHAINE SÉANCE', style: TextStyle(color: textMuted, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)), 
+                                  const SizedBox(height: 6), 
+                                  Text(widget.nextSessionName.isEmpty ? "Aucune de planifiée" : widget.nextSessionName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textMain)),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.analytics_outlined, size: 13, color: accentCyan),
+                                      const SizedBox(width: 6),
+                                      Text(_averageDurationText, style: TextStyle(color: accentCyan, fontSize: 12, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                ],
                               ),
-                              IconButton(
-                                onPressed: () => _logMorningWeight(_currentWeight, _targetWeight), 
-                                icon: Icon(Icons.add_circle, color: accentCyan, size: 36)
-                              ),
-                            ]
+                            ),
+                            const SizedBox(width: 12),
+                            ElevatedButton(
+                              onPressed: widget.onStartSession, 
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: accentCyan, 
+                                foregroundColor: bgColor,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ), 
+                              child: const Text('Lancer', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // --- RÉGULARITÉ ---
+                      const ConsistencyTracker(),
+                      const SizedBox(height: 28),
+                      
+                      // --- NUTRITION SECTION ---
+                      Text('Nutrition du jour', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textMain, letterSpacing: 0.2)),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 8.0),
+                        decoration: BoxDecoration(
+                          color: cardColor,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _buildCircularMacro('Kcal', _consumedKcal, _targetKcal, accentCyan),
+                            _buildCircularMacro('Prot', _consumedProt, _targetProt, Colors.redAccent.shade200),
+                            _buildCircularMacro('Gluc', _consumedCarbs, _targetCarbs, Colors.greenAccent.shade400),
+                            _buildCircularMacro('Lip', _consumedLipids, _targetLipids, Colors.orangeAccent.shade200),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+
+                      // --- SUIVI CORPOREL ---
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Poids de corps', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textMain, letterSpacing: 0.2)),
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () => _logMorningWeight(_currentWeight, _targetWeight), 
+                            icon: Icon(Icons.add_circle_outline_rounded, color: accentCyan, size: 22)
                           ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            height: 180, 
-                            child: WeightChart(
-                              weightHistory: _weightHistory, 
-                              targetWeight: _targetWeight
-                            )
-                          ),
-                        ]
-                      )
-                    )
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(20.0), 
+                        decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween, 
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                                  textBaseline: TextBaseline.alphabetic,
+                                  children: [
+                                    Text(_currentWeight.toStringAsFixed(1), style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: textMain, letterSpacing: -0.5)), 
+                                    const SizedBox(width: 4),
+                                    Text('kg', style: TextStyle(color: textMuted, fontSize: 14, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                                if (_targetWeight > 0) 
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8)),
+                                    child: Text('Cible : ${_targetWeight.toStringAsFixed(1)} kg', style: TextStyle(color: accentCyan, fontSize: 11, fontWeight: FontWeight.bold)),
+                                  )
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            SizedBox(
+                              height: 140, 
+                              child: WeightChart(
+                                weightHistory: _weightHistory, 
+                                targetWeight: _targetWeight
+                              )
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                ],
+                ),
               ),
-            ),
-          ),
-        );
-      },
+      ),
     );
   }
 
+  // Ronds sobres avec couleurs signatures d'origines conservées
   Widget _buildCircularMacro(String label, int consumed, int target, Color color) {
     double progress = target > 0 ? (consumed / target).clamp(0.0, 1.0) : 0.0;
-    return Column(children: [
-      Stack(alignment: Alignment.center, children: [
-        SizedBox(width: 65, height: 65, child: CircularProgressIndicator(value: 1.0, strokeWidth: 6, color: bgColor)),
-        SizedBox(width: 65, height: 65, child: CircularProgressIndicator(value: progress, strokeWidth: 6, color: color)),
-        Text('$consumed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textMain)),
-      ]),
-      const SizedBox(height: 10),
-      Text(label, style: TextStyle(color: textMuted, fontSize: 13)),
-    ]);
+    return Column(
+      children: [
+        Stack(
+          alignment: Alignment.center, 
+          children: [
+            // Fond circulaire ultra-discret
+            SizedBox(
+              width: 60, 
+              height: 60, 
+              child: CircularProgressIndicator(value: 1.0, strokeWidth: 2.5, color: bgColor.withOpacity(0.4))
+            ),
+            // Arc de progression dynamique coloré
+            SizedBox(
+              width: 60, 
+              height: 60, 
+              child: CircularProgressIndicator(
+                value: progress, 
+                strokeWidth: 2.5, 
+                color: color,
+              )
+            ),
+            Text('$consumed', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: textMain)),
+          ]
+        ),
+        const SizedBox(height: 10),
+        Text(label, style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.2)),
+      ],
+    );
   }
 }

@@ -227,27 +227,41 @@ class _NutritionSetupScreenState extends State<NutritionSetupScreen> {
     ],
   );
 
-  Widget _stepAge() => _inputStep("Quel âge as-tu ?", (val) => _age = int.tryParse(val) ?? 25, "ans", _age.toString());
+  Widget _stepAge() => _inputStep(
+        "Quel âge as-tu ?",
+        (val) => setState(() => _age = int.tryParse(val) ?? 25),
+        "ans",
+        _age.toString(),
+      );
 
-  Widget _stepHeight() => _inputStep("Combien mesures-tu ?", (val) => _height = int.tryParse(val) ?? 175, "cm", _height.toString());
+  Widget _stepHeight() => _inputStep(
+        "Combien mesures-tu ?",
+        (val) => setState(() => _height = int.tryParse(val) ?? 175),
+        "cm",
+        _height.toString(),
+      );
 
-  Widget _stepWeight() => _inputStep("Ton poids actuel ?", (val) => _currentWeight = double.tryParse(val) ?? 75.0, "kg", _currentWeight.toString());
+  Widget _stepWeight() => _inputStep(
+        "Ton poids actuel ?",
+        (val) => setState(() => _currentWeight = double.tryParse(val) ?? 75.0),
+        "kg",
+        _currentWeight.toString(),
+      );
 
-  Widget _stepGoalWeight() => _titleAndSubtitleStep("Ton poids cible ?", "Définit si tu dois être en surplus ou en déficit.", (val) => _targetWeight = double.tryParse(val) ?? 80.0, "kg", _targetWeight.toString());
+  Widget _stepGoalWeight() => _titleAndSubtitleStep(
+        "Ton poids cible ?",
+        "Définit si tu dois être en surplus ou en déficit.",
+        (val) => setState(() => _targetWeight = double.tryParse(val) ?? 80.0),
+        "kg",
+        _targetWeight.toString(),
+      );
 
-  Widget _stepActivity() => Column(
-    children: [
-      _title("Niveau d'activité"),
-      const SizedBox(height: 20),
-      _activityTile("Sédentaire", "Bureau, peu de marche", 'sedentaire'),
-      _activityTile("Légère", "Muscu 1-2x / semaine", 'leger'),
-      _activityTile("Modérée", "Muscu 3-5x / semaine", 'modere'),
-      _activityTile("Intense", "Entraînement quotidien", 'actif'),
-    ],
-  );
-
-  Widget _stepDuration() => _inputStep("En combien de semaines ?", (val) => _durationWeeks = int.tryParse(val) ?? 12, "semaines", _durationWeeks.toString());
-
+  Widget _stepDuration() => _inputStep(
+        "En combien de semaines ?",
+        (val) => setState(() => _durationWeeks = int.tryParse(val) ?? 12),
+        "semaines",
+        _durationWeeks.toString(),
+      );
   Widget _stepSummary() => Column(
     children: [
       _title("Ton plan est prêt ! 🦾"),
@@ -280,6 +294,17 @@ class _NutritionSetupScreenState extends State<NutritionSetupScreen> {
           ),
         ),
       )
+    ],
+  );
+
+  Widget _stepActivity() => Column(
+    children: [
+      _title("Niveau d'activité"),
+      const SizedBox(height: 20),
+      _activityTile("Sédentaire", "Bureau, peu de marche", 'sedentaire'),
+      _activityTile("Légère", "Muscu 1-2x / semaine", 'leger'),
+      _activityTile("Modérée", "Muscu 3-5x / semaine", 'modere'),
+      _activityTile("Intense", "Entraînement quotidien", 'actif'),
     ],
   );
 

@@ -17,6 +17,12 @@ class _SignupScreenState extends State<SignupScreen> {
 
   final _supabase = Supabase.instance.client;
 
+  // Signatures Design LiftLog Luxe
+  final Color bgColor = const Color(0xFF13171C);
+  final Color accentCyan = const Color(0xFF38B6FF);
+  final Color textMain = Colors.white;
+  final Color textMuted = const Color(0xFFA0AAB5);
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -40,7 +46,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
     if (password != confirmPassword) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Les mots de passe ne correspondent pas'), backgroundColor: Colors.redAccent),
+        SnackBar(content: Text('Les mots de passe ne correspondent pas'), backgroundColor: Colors.redAccent),
       );
       return;
     }
@@ -76,8 +82,7 @@ class _SignupScreenState extends State<SignupScreen> {
     try {
       await _supabase.auth.signInWithOAuth(
         provider,
-        redirectTo: 'myfitnessapp://login-callback',
-        authScreenLaunchMode: LaunchMode.inAppWebView,
+        redirectTo: 'com.tonnom.liftlog://login-callback', // Aligné sur ton LoginScreen
       );
     } on AuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -89,12 +94,12 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF13171C),
+      backgroundColor: bgColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -106,16 +111,24 @@ class _SignupScreenState extends State<SignupScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
+                // 🖼️ TON MINI LOGO DISCRET EN EN-TÊTE
+                Image.asset(
+                  'assets/img/min_logo.png',
+                  height: 45,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 20),
+                
+                Text(
                   "Créer un compte",
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: textMain, fontFamily: 'Inter', letterSpacing: -0.5),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
-                  "Rejoins LiftLog pour planifier tes entraînements",
+                  "Rejoins la plateforme pour planifier tes entraînements",
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                  style: TextStyle(color: textMuted, fontSize: 14, fontFamily: 'Inter'),
                 ),
                 const SizedBox(height: 36),
 
@@ -123,10 +136,13 @@ class _SignupScreenState extends State<SignupScreen> {
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
+                  style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: "Adresse Email",
-                    prefixIcon: const Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    labelStyle: TextStyle(color: textMuted),
+                    prefixIcon: Icon(Icons.email_outlined, color: textMuted),
+                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800), borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentCyan), borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -135,10 +151,13 @@ class _SignupScreenState extends State<SignupScreen> {
                 TextField(
                   controller: _passwordController,
                   obscureText: true,
+                  style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: "Mot de passe",
-                    prefixIcon: const Icon(Icons.lock_outlined),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    labelStyle: TextStyle(color: textMuted),
+                    prefixIcon: Icon(Icons.lock_outlined, color: textMuted),
+                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800), borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentCyan), borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -147,50 +166,53 @@ class _SignupScreenState extends State<SignupScreen> {
                 TextField(
                   controller: _confirmPasswordController,
                   obscureText: true,
+                  style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: "Confirmer le mot de passe",
-                    prefixIcon: const Icon(Icons.lock_reset_outlined),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    labelStyle: TextStyle(color: textMuted),
+                    prefixIcon: Icon(Icons.lock_reset_outlined, color: textMuted),
+                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800), borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentCyan), borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
                 const SizedBox(height: 24),
 
-                // Bouton Inscription Email
+                // Bouton Inscription
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleEmailSignUp,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
-                    foregroundColor: Colors.white,
+                    backgroundColor: accentCyan,
+                    foregroundColor: bgColor,
+                    elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: _isLoading
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text("S'inscrire", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: bgColor, strokeWidth: 2))
+                      : const Text("S'inscrire", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                 ),
 
                 const SizedBox(height: 32),
                 Row(
                   children: [
-                    const Expanded(child: Divider(color: Colors.grey)),
+                    Expanded(child: Divider(color: Colors.grey.shade800)),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text("Ou continuer avec", style: TextStyle(color: Colors.grey[600])),
+                      child: Text("Ou continuer avec", style: TextStyle(color: textMuted, fontSize: 13)),
                     ),
-                    const Expanded(child: Divider(color: Colors.grey)),
+                    Expanded(child: Divider(color: Colors.grey.shade800)),
                   ],
                 ),
                 const SizedBox(height: 24),
 
-                // Uniquement le Bouton Apple ici aussi
+                // Bouton Apple
                 _socialButton(
                   text: "Continuer avec Apple",
                   icon: FontAwesomeIcons.apple,
                   iconColor: Colors.white,
                   onPressed: () => _handleSocialSignIn(OAuthProvider.apple),
                 ),
-
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
               ],
             ),
           ),
@@ -201,7 +223,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Widget _socialButton({
     required String text,
-    required dynamic icon, // <-- On change IconData par dynamic pour accepter FontAwesome sans conflit
+    required dynamic icon,
     required Color iconColor,
     required VoidCallback onPressed,
   }) {
@@ -210,10 +232,10 @@ class _SignupScreenState extends State<SignupScreen> {
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        side: BorderSide(color: Colors.grey[800]!),
+        side: BorderSide(color: Colors.grey.shade800),
       ),
       icon: FaIcon(icon, color: iconColor, size: 20),
-      label: Text(text, style: const TextStyle(color: Colors.white, fontSize: 15)),
+      label: Text(text, style: const TextStyle(color: Colors.white, fontSize: 15, fontFamily: 'Inter')),
     );
   }
 }

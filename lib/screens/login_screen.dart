@@ -17,6 +17,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final _supabase = Supabase.instance.client;
 
+  // Signatures Design LiftLog
+  final Color bgColor = const Color(0xFF13171C);
+  final Color accentCyan = const Color(0xFF38B6FF);
+  final Color textMuted = const Color(0xFFA0AAB5);
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -24,7 +29,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // Connexion Classique (Email/Mot de passe)
   Future<void> _handleEmailSignIn() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -33,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Veuillez remplir tous les champs')),
       );
-      return; // <-- Remplace le { } par return; ici
+      return;
     }
 
     setState(() => _isLoading = true);
@@ -56,27 +60,22 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // Connexion Sociale (Apple)
   Future<void> signInWithApple() async {
-  try {
-    await Supabase.instance.client.auth.signInWithOAuth(
-      OAuthProvider.apple,
-      // Cette URL doit matcher le schéma qu'on vient de mettre dans le Info.plist
-      redirectTo: 'com.tonnom.liftlog://login-callback',
-    );
-    
-    // Si pas d'erreur, l'utilisateur est connecté ! Supabase gère la session tout seul.
-    debugPrint("🔥 Connexion Apple réussie !");
-    
-  } catch (e) {
-    debugPrint("❌ Erreur Connexion Apple : $e");
+    try {
+      await _supabase.auth.signInWithOAuth(
+        OAuthProvider.apple,
+        redirectTo: 'com.tonnom.liftlog://login-callback',
+      );
+      debugPrint("🔥 Connexion Apple réussie !");
+    } catch (e) {
+      debugPrint("❌ Erreur Connexion Apple : $e");
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF13171C),
+      backgroundColor: bgColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -85,19 +84,18 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Logo / Titre
-                const Icon(Icons.fitness_center, size: 64, color: Colors.blueAccent),
-                const SizedBox(height: 16),
-                const Text(
-                  "LiftLog",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                // 🖼️ TON NOUVEAU LOGO PREMIUM
+                Image.asset(
+                  'assets/img/logo.png',
+                  height: 80, // Hauteur ajustée pour un look sobre et pro
+                  fit: BoxFit.contain,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 16),
+                
                 Text(
                   "Connecte-toi pour suivre tes performances",
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                  style: TextStyle(color: textMuted, fontSize: 14, fontFamily: 'Inter'),
                 ),
                 const SizedBox(height: 40),
 
@@ -105,10 +103,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
+                  style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: "Adresse Email",
-                    prefixIcon: const Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    labelStyle: TextStyle(color: textMuted),
+                    prefixIcon: Icon(Icons.email_outlined, color: textMuted),
+                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800), borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentCyan), borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -117,42 +118,46 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextField(
                   controller: _passwordController,
                   obscureText: true,
+                  style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     labelText: "Mot de passe",
-                    prefixIcon: const Icon(Icons.lock_outlined),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    labelStyle: TextStyle(color: textMuted),
+                    prefixIcon: Icon(Icons.lock_outlined, color: textMuted),
+                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800), borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentCyan), borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
                 const SizedBox(height: 24),
 
-                // Bouton Connexion Email
+                // Bouton Connexion
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleEmailSignIn,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
-                    foregroundColor: Colors.white,
+                    backgroundColor: accentCyan,
+                    foregroundColor: bgColor,
+                    elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: _isLoading
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text("Se connecter", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: bgColor, strokeWidth: 2))
+                      : const Text("Se connecter", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                 ),
                 
                 const SizedBox(height: 32),
                 Row(
                   children: [
-                    const Expanded(child: Divider(color: Colors.grey)),
+                    Expanded(child: Divider(color: Colors.grey.shade800)),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text("Ou continuer avec", style: TextStyle(color: Colors.grey[600])),
+                      child: Text("Ou continuer avec", style: TextStyle(color: textMuted, fontSize: 13)),
                     ),
-                    const Expanded(child: Divider(color: Colors.grey)),
+                    Expanded(child: Divider(color: Colors.grey.shade800)),
                   ],
                 ),
                 const SizedBox(height: 24),
 
-                // Bouton Apple unique
+                // Bouton Apple
                 _socialButton(
                   text: "Continuer avec Apple",
                   icon: FontAwesomeIcons.apple,
@@ -162,16 +167,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 32),
 
-                // Lien vers l'inscription
+                // Lien Inscription
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text("Tu n'as pas de compte ?", style: TextStyle(color: Colors.grey[400])),
+                    Text("Tu n'as pas de compte ?", style: TextStyle(color: textMuted)),
                     TextButton(
                       onPressed: () {
                         Navigator.push(context, MaterialPageRoute(builder: (context) => const SignupScreen()));
                       },
-                      child: const Text("S'inscrire", style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+                      child: Text("S'inscrire", style: TextStyle(color: accentCyan, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                     ),
                   ],
                 ),
@@ -185,7 +190,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _socialButton({
     required String text,
-    required dynamic icon, // <-- On change IconData par dynamic pour accepter FontAwesome sans conflit
+    required dynamic icon,
     required Color iconColor,
     required VoidCallback onPressed,
   }) {
@@ -194,10 +199,10 @@ class _LoginScreenState extends State<LoginScreen> {
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        side: BorderSide(color: Colors.grey[800]!),
+        side: BorderSide(color: Colors.grey.shade800),
       ),
       icon: FaIcon(icon, color: iconColor, size: 20),
-      label: Text(text, style: const TextStyle(color: Colors.white, fontSize: 15)),
+      label: Text(text, style: const TextStyle(color: Colors.white, fontSize: 15, fontFamily: 'Inter')),
     );
   }
 }

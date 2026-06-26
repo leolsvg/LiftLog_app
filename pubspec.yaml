@@ -11,6 +11,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+    assets:
+      - assets/img/logo.png
+      - assets/img/min_logo.png
+
+  image_picker: ^1.1.2  # Pour prendre des photos avec l'appareil ou la galerie
+  
   url_launcher: ^6.3.0
   cupertino_icons: ^1.0.8
   http: ^1.6.0

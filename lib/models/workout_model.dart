@@ -25,19 +25,21 @@ class WorkoutSet {
 }
 
 class Exercise {
-  String name; // Retrait de final pour permettre le remplacement en direct
+  String name; 
   final List<WorkoutSet> sets;
   final bool isCardio;
-  final List<String> alternatives; // Stocke les noms des exercices de remplacement
+  final List<String> alternatives; 
+  String? imageUrl; // 🧱 Ajout de la propriété pour l'image anatomique rouge
 
   Exercise({
     required this.name, 
     required this.sets, 
     this.isCardio = false,
-    this.alternatives = const [], // Par défaut, liste vide s'il n'y a pas d'alternative
+    this.alternatives = const [], 
+    this.imageUrl, // Initialisation optionnelle
   });
 
-  // Helper factory mis à jour pour inclure les alternatives à la création si besoin
+  // Helper factory mis à jour pour inclure les alternatives et l'image à la création
   factory Exercise.createTarget({
     required String name, 
     int targetSets = 3, 
@@ -47,11 +49,13 @@ class Exercise {
     double targetDistance = 0.0, 
     bool isCardio = false,
     List<String> alternatives = const [],
+    String? imageUrl, // Ajout au helper
   }) {
     return Exercise(
       name: name,
       isCardio: isCardio,
       alternatives: alternatives,
+      imageUrl: imageUrl,
       sets: List.generate(targetSets, (_) => WorkoutSet(weight: targetWeight, reps: targetReps, duration: targetDuration, distance: targetDistance)),
     );
   }
@@ -59,7 +63,8 @@ class Exercise {
   Map<String, dynamic> toFirestore() => {
         'name': name,
         'isCardio': isCardio,
-        'alternatives': alternatives, // Ajout au mapping pour la base de données
+        'alternatives': alternatives, 
+        'image_url': imageUrl, // Mapping pour sauver l'URL sur la base
         'sets': sets.map((s) => s.toMap()).toList(),
       };
 
@@ -68,7 +73,8 @@ class Exercise {
   factory Exercise.fromFirestore(Map<String, dynamic> data) => Exercise(
         name: data['name'] ?? 'Exercice',
         isCardio: data['isCardio'] ?? false,
-        alternatives: List<String>.from(data['alternatives'] ?? []), // Récupération propre de la liste
+        alternatives: List<String>.from(data['alternatives'] ?? []), 
+        imageUrl: data['image_url'], // 🔌 Récupération propre depuis le flux Supabase
         sets: (data['sets'] as List?)?.map((s) => WorkoutSet.fromMap(s as Map<String, dynamic>)).toList() ?? [],
       );
 
