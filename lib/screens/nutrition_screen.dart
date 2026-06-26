@@ -29,9 +29,10 @@ class NutritionScreen extends StatefulWidget {
 }
 
 class _NutritionScreenState extends State<NutritionScreen> {
-  final Color bgColor = const Color(0xFF13171C);
-  final Color cardColor = const Color(0xFF1F252D);
-  final Color accentCyan = const Color(0xFF38B6FF);
+  // --- Palette de couleurs GAIN (Or & Anthracite unifié) ---
+  final Color bgColor = const Color(0xFF191919);
+  final Color cardColor = const Color(0xFF242424);
+  final Color accentGold = const Color(0xFFC7AA0C);
   final Color textMain = Colors.white;
   final Color textMuted = const Color(0xFFA0AAB5);
 
@@ -60,7 +61,6 @@ class _NutritionScreenState extends State<NutritionScreen> {
     setState(() => _isLoading = false);
   }
 
-  // 📐 LOGIQUE DE CALCUL DU TMB ET DES MACROS JUSQU'À L'OBJECTIF
   Future<void> _loadUserProfileAndCalculate() async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
@@ -99,19 +99,15 @@ class _NutritionScreenState extends State<NutritionScreen> {
         if (joursRestants > 7) {
           double semaines = joursRestants / 7;
           double kgParSemaine = deltaPoids / semaines;
-          // 1kg de gras de réserve ~ 7700 kcal. On lisse l'apport de manière safe (max 1000 kcal de deficit/surplus)
           ajustementCalorique = (kgParSemaine * 7700 / 7).round().clamp(-1000, 1000);
         }
       }
 
-      // Calcul des calories cibles finales
       int finalKcal = (bej + ajustementCalorique).round().clamp(1500, 5000);
 
-      // 4. Répartition des Macros d'un sportif de force
-      int prot = (currentWeight * 2.0).round(); // 2g / kg de poids de corps
-      int lipids = (currentWeight * 1.0).round(); // 1g / kg de poids de corps
+      int prot = (currentWeight * 2.0).round(); 
+      int lipids = (currentWeight * 1.0).round(); 
       
-      // Le reste des calories va aux glucides (1g prot = 4kcal, 1g lip = 9kcal, 1g gluc = 4kcal)
       int caloriesRestantes = finalKcal - (prot * 4) - (lipids * 9);
       int carbs = (caloriesRestantes / 4).round().clamp(50, 800);
 
@@ -122,10 +118,9 @@ class _NutritionScreenState extends State<NutritionScreen> {
         _targetCarbs = carbs;
       });
 
-      // Mettre à jour en tâche de fond dans Supabase pour que le dashboard lise les bonnes valeurs cibles
       await _supabase.from('user_profiles').upsert({
         'user_id': user.id,
-        'consumed_kcal': data['consumed_kcal'] ?? 0, // Ne pas écraser la nutrition du jour
+        'consumed_kcal': data['consumed_kcal'] ?? 0, 
         'target_kcal': _targetKcal,
         'target_prot': _targetProt,
         'target_carbs': _targetCarbs,
@@ -151,7 +146,6 @@ class _NutritionScreenState extends State<NutritionScreen> {
     _foodCatalog = List<Map<String, dynamic>>.from(response);
   }
 
-  // 📝 QUESTIONNAIRE INTUITIF EN POPUP POUR METTRE À JOUR LE PROFIL NUTRITIONNEL
   void _showSetupNutritionDialog() async {
     final bool? updated = await Navigator.push(
       context,
@@ -159,7 +153,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
     );
 
     if (updated == true) {
-      _loadAllData(); // Recharge les macros et le bandeau après le questionnaire
+      _loadAllData(); 
     }
   }
 
@@ -189,7 +183,12 @@ class _NutritionScreenState extends State<NutritionScreen> {
       }, onConflict: 'user_id,date');
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Nutrition mise à jour ! 🍳"), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text("Nutrition mise à jour ! 🍳", style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold)), 
+            backgroundColor: cardColor,
+          )
+        );
       }
     } catch (e) {
       debugPrint("Erreur ajout macros : $e");
@@ -217,7 +216,8 @@ class _NutritionScreenState extends State<NutritionScreen> {
 
             return AlertDialog(
               backgroundColor: cardColor,
-              title: Text("Nouveau plat composé", style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 18)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Text("Nouveau plat composé", style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Inter')),
               content: SizedBox(
                 width: double.maxFinite,
                 child: SingleChildScrollView(
@@ -225,67 +225,81 @@ class _NutritionScreenState extends State<NutritionScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TextField(controller: mealNameController, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Nom du plat (ex: Riz Poulet Curry)", labelStyle: TextStyle(color: textMuted, fontSize: 13))),
-                      const SizedBox(height: 20),
-                      Text("AJOUTER UN ALIMENT", style: TextStyle(color: accentCyan, fontSize: 11, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
+                      TextField(
+                        controller: mealNameController, 
+                        style: TextStyle(color: textMain, fontFamily: 'Inter'), 
+                        decoration: InputDecoration(
+                          labelText: "Nom du plat (ex: Riz Poulet Curry)", 
+                          labelStyle: TextStyle(color: textMuted, fontSize: 13),
+                          enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
+                          focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text("AJOUTER UN ALIMENT", style: TextStyle(color: accentGold, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5, fontFamily: 'Inter')),
+                      const SizedBox(height: 10),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8)),
+                        decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10)),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<Map<String, dynamic>>(
                             dropdownColor: cardColor,
-                            hint: Text("Choisir un ingrédient...", style: TextStyle(color: textMuted, fontSize: 14)),
+                            hint: Text("Choisir un ingrédient...", style: TextStyle(color: textMuted, fontSize: 13, fontFamily: 'Inter')),
                             value: selectedFood,
                             isExpanded: true,
                             items: _foodCatalog.map((food) {
-                              return DropdownMenuItem<Map<String, dynamic>>(value: food, child: Text("${food['name']} (100g)", style: TextStyle(color: textMain, fontSize: 14)));
+                              return DropdownMenuItem<Map<String, dynamic>>(value: food, child: Text("${food['name']} (100g)", style: TextStyle(color: textMain, fontSize: 13, fontFamily: 'Inter')));
                             }).toList(),
                             onChanged: (value) => setDialogState(() => selectedFood = value),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
-                            child: SizedBox(
+                            child: Container(
                               height: 40,
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10)),
                               child: TextField(
                                 controller: weightController,
                                 keyboardType: TextInputType.number,
-                                style: TextStyle(color: textMain, fontSize: 14),
-                                decoration: InputDecoration(labelText: "Quantité / Poids (g)", labelStyle: TextStyle(color: textMuted, fontSize: 12), filled: true, fillColor: bgColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(horizontal: 12)),
+                                style: TextStyle(color: textMain, fontSize: 14, fontFamily: 'Inter'),
+                                decoration: InputDecoration(labelText: "Poids (g)", labelStyle: TextStyle(color: textMuted, fontSize: 11), border: InputBorder.none, contentPadding: EdgeInsets.zero),
                               ),
                             ),
                           ),
                           const SizedBox(width: 12),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: bgColor, side: BorderSide(color: accentCyan.withOpacity(0.5)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                            onPressed: () {
-                              final int? weight = int.tryParse(weightController.text);
-                              if (selectedFood == null || weight == null || weight <= 0) return;
+                          SizedBox(
+                            height: 40,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: bgColor, elevation: 0, side: BorderSide(color: accentGold.withValues(alpha:0.4)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                              onPressed: () {
+                                final int? weight = int.tryParse(weightController.text);
+                                if (selectedFood == null || weight == null || weight <= 0) return;
 
-                              final int k = ((selectedFood!['kcal_per_100g'] as int) * weight ~/ 100);
-                              final int p = ((selectedFood!['prot_per_100g'] as int) * weight ~/ 100);
-                              final int c = ((selectedFood!['carbs_per_100g'] as int) * weight ~/ 100);
-                              final int l = ((selectedFood!['lipids_per_100g'] as int) * weight ~/ 100);
+                                final int k = ((selectedFood!['kcal_per_100g'] as int) * weight ~/ 100);
+                                final int p = ((selectedFood!['prot_per_100g'] as int) * weight ~/ 100);
+                                final int c = ((selectedFood!['carbs_per_100g'] as int) * weight ~/ 100);
+                                final int l = ((selectedFood!['lipids_per_100g'] as int) * weight ~/ 100);
 
-                              setDialogState(() {
-                                tempIngredients.add(RecipeIngredient(name: selectedFood!['name'], weight: weight, kcal: k, prot: p, carbs: c, lipids: l));
-                                recalculateTotals();
-                                weightController.clear();
-                                selectedFood = null;
-                              });
-                            },
-                            child: Text("Ajouter", style: TextStyle(color: accentCyan, fontWeight: FontWeight.bold)),
+                                setDialogState(() {
+                                  tempIngredients.add(RecipeIngredient(name: selectedFood!['name'], weight: weight, kcal: k, prot: p, carbs: c, lipids: l));
+                                  recalculateTotals();
+                                  weightController.clear();
+                                  selectedFood = null;
+                                });
+                              },
+                              child: Text("Ajouter", style: TextStyle(color: accentGold, fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'Inter')),
+                            ),
                           )
                         ],
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
                       if (tempIngredients.isNotEmpty) ...[
-                        Text("COMPOSITION DU PLAT", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 6),
+                        Text("COMPOSITION DU PLAT", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5, fontFamily: 'Inter')),
+                        const SizedBox(height: 8),
                         Container(
                           constraints: const BoxConstraints(maxHeight: 120),
                           child: ListView.builder(
@@ -299,24 +313,22 @@ class _NutritionScreenState extends State<NutritionScreen> {
                                 background: Container(
                                   alignment: Alignment.centerRight,
                                   padding: const EdgeInsets.only(right: 12.0),
-                                  color: Colors.redAccent.withOpacity(0.2),
-                                  child: const Icon(Icons.remove_circle_outline, color: Colors.redAccent, size: 18),
+                                  decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha:0.15), borderRadius: BorderRadius.circular(8)),
+                                  child: const Icon(Icons.remove_circle_outline_rounded, color: Colors.redAccent, size: 18),
                                 ),
                                 onDismissed: (direction) {
-                                  // Utilise setDialogState fourni par le StatefulBuilder de la popup
                                   setDialogState(() {
                                     tempIngredients.removeAt(idx);
-                                    // Recalcule automatiquement les totaux affichés dans la preview du plat
                                     recalculateTotals();
                                   });
                                 },
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 3.0),
+                                  padding: const EdgeInsets.symmetric(vertical: 4.0),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text("${ing.name} (${ing.weight}g)", style: TextStyle(color: textMain, fontSize: 13)),
-                                      Text("${ing.kcal} kcal", style: TextStyle(color: textMuted, fontSize: 13)),
+                                      Text("${ing.name} (${ing.weight}g)", style: TextStyle(color: textMain, fontSize: 13, fontFamily: 'Inter')),
+                                      Text("${ing.kcal} kcal", style: TextStyle(color: textMuted, fontSize: 13, fontFamily: 'Inter')),
                                     ],
                                   ),
                                 ),
@@ -324,21 +336,25 @@ class _NutritionScreenState extends State<NutritionScreen> {
                             },
                           ),
                         ),
-                        const Divider(color: Colors.white10, height: 24),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12.0),
+                          child: Divider(color: Colors.grey.shade900, height: 1),
+                        ),
                       ],
                       Container(
+                        width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10)),
                         child: Column(
                           children: [
-                            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text("Calories totales :", style: TextStyle(color: textMuted, fontSize: 13)), Text("$totalKcal kcal", style: TextStyle(color: accentCyan, fontWeight: FontWeight.bold, fontSize: 14))]),
-                            const SizedBox(height: 6),
+                            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text("Calories totales :", style: TextStyle(color: textMuted, fontSize: 12, fontFamily: 'Inter')), Text("$totalKcal kcal", style: TextStyle(color: accentGold, fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'Inter'))]),
+                            const SizedBox(height: 8),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text("P: ${totalProt}g", style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
-                                Text("G: ${totalCarbs}g", style: const TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold)),
-                                Text("L: ${totalLipids}g", style: const TextStyle(color: Colors.orangeAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                                Text("P: ${totalProt}g", style: TextStyle(color: textMain, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
+                                Text("G: ${totalCarbs}g", style: TextStyle(color: textMain, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
+                                Text("L: ${totalLipids}g", style: TextStyle(color: textMain, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                               ],
                             )
                           ],
@@ -349,23 +365,46 @@ class _NutritionScreenState extends State<NutritionScreen> {
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: Text("Annuler", style: TextStyle(color: textMuted))),
+                TextButton(
+                  onPressed: () => Navigator.pop(context), 
+                  child: Text("Annuler", style: TextStyle(color: textMuted, fontFamily: 'Inter')),
+                ),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentGold, 
+                    foregroundColor: bgColor, 
+                    elevation: 0, 
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                   onPressed: () async {
                     final user = _supabase.auth.currentUser;
                     if (user == null || mealNameController.text.trim().isEmpty || tempIngredients.isEmpty) return;
 
-                    final meal = CustomMeal(name: mealNameController.text.trim(), kcal: totalKcal, prot: totalProt, carbs: totalCarbs, lipids: totalLipids);
+                    // 1. Capture de l'instance de navigation AVANT le gap asynchrone
+                    final navigator = Navigator.of(context);
+
+                    final meal = CustomMeal(
+                      name: mealNameController.text.trim(), 
+                      kcal: totalKcal, 
+                      prot: totalProt, 
+                      carbs: totalCarbs, 
+                      lipids: totalLipids,
+                    );
+                    
                     await _supabase.from('custom_meals').insert(meal.toMap(user.id));
-                    Navigator.pop(context);
+                    
+                    // 2. Vérification réglementaire du BuildContext après le await
+                    if (!context.mounted) return;
+
+                    // 3. Utilisation de la référence locale sécurisée
+                    navigator.pop();
                     _loadAllData();
                   },
-                  child: const Text("Enregistrer le plat", style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text("Enregistrer le plat", style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                 )
               ],
             );
-          },
+          }
         );
       },
     );
@@ -382,23 +421,24 @@ class _NutritionScreenState extends State<NutritionScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: cardColor,
-        title: Text("Ajouter un ingrédient de base (100g)", style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text("Ajouter un ingrédient (100g)", style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Inter')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: nameController, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Nom de l'ingrédient", labelStyle: TextStyle(color: textMuted))),
-              TextField(controller: kcalController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Calories (pour 100g)", labelStyle: TextStyle(color: textMuted))),
-              TextField(controller: protController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Protéines (pour 100g)", labelStyle: TextStyle(color: textMuted))),
-              TextField(controller: carbsController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Glucides (pour 100g)", labelStyle: TextStyle(color: textMuted))),
-              TextField(controller: lipidsController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Lipides (pour 100g)", labelStyle: TextStyle(color: textMuted))),
+              TextField(controller: nameController, style: TextStyle(color: textMain, fontFamily: 'Inter'), decoration: InputDecoration(labelText: "Nom de l'ingrédient", labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)), focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)))),
+              TextField(controller: kcalController, keyboardType: TextInputType.number, style: TextStyle(color: textMain, fontFamily: 'Inter'), decoration: InputDecoration(labelText: "Calories (pour 100g)", labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)), focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)))),
+              TextField(controller: protController, keyboardType: TextInputType.number, style: TextStyle(color: textMain, fontFamily: 'Inter'), decoration: InputDecoration(labelText: "Protéines (pour 100g)", labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)), focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)))),
+              TextField(controller: carbsController, keyboardType: TextInputType.number, style: TextStyle(color: textMain, fontFamily: 'Inter'), decoration: InputDecoration(labelText: "Glucides (pour 100g)", labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)), focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)))),
+              TextField(controller: lipidsController, keyboardType: TextInputType.number, style: TextStyle(color: textMain, fontFamily: 'Inter'), decoration: InputDecoration(labelText: "Lipides (pour 100g)", labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)), focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)))),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text("Annuler", style: TextStyle(color: textMuted))),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text("Annuler", style: TextStyle(color: textMuted, fontFamily: 'Inter'))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor),
+            style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: bgColor, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
             onPressed: () async {
               final user = _supabase.auth.currentUser;
               if (user == null || nameController.text.trim().isEmpty) return;
@@ -412,10 +452,13 @@ class _NutritionScreenState extends State<NutritionScreen> {
                 'lipids_per_100g': int.tryParse(lipidsController.text) ?? 0,
               });
 
+              // 🦾 CORRECTIF : On s'assure que l'arbre des widgets est toujours actif avant de fermer la boîte de dialogue
+              if (!context.mounted) return;
+
               Navigator.pop(context);
               _loadAllData();
             },
-            child: const Text("Enregistrer", style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text("Enregistrer", style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Inter')),
           )
         ],
       ),
@@ -427,16 +470,17 @@ class _NutritionScreenState extends State<NutritionScreen> {
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
-        title: Text("Ma Nutrition", style: TextStyle(color: textMain, fontWeight: FontWeight.bold)),
+        title: Text("MA NUTRITION", style: TextStyle(color: textMain, fontFamily: 'TheSeason', fontSize: 16, letterSpacing: 0.5)),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: true,
         iconTheme: IconThemeData(color: textMain),
         actions: [
-          IconButton(icon: const Icon(Icons.playlist_add), onPressed: _showCreateBaseFoodDialog),
+          IconButton(icon: Icon(Icons.playlist_add_rounded, color: textMain, size: 22), onPressed: _showCreateBaseFoodDialog),
         ],
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: accentCyan))
+          ? Center(child: CircularProgressIndicator(color: accentGold, strokeWidth: 2))
           : Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -445,7 +489,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
                   // --- BANDEAU DES MACROS CIBLES AUTOMATIQUES ---
                   Container(
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: accentCyan.withOpacity(0.2))),
+                    decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(14), border: Border.all(color: accentGold.withValues(alpha:0.15))),
                     child: Column(
                       children: [
                         Row(
@@ -454,14 +498,15 @@ class _NutritionScreenState extends State<NutritionScreen> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text("Cible calculée", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold)),
-                                Text("$_targetKcal kcal / jour", style: TextStyle(color: textMain, fontSize: 18, fontWeight: FontWeight.w900)),
+                                Text("Cible calculée", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
+                                const SizedBox(height: 2),
+                                Text("$_targetKcal kcal / jour", style: TextStyle(color: textMain, fontSize: 18, fontWeight: FontWeight.w900, fontFamily: 'Inter')),
                               ],
                             ),
                             TextButton.icon(
                               onPressed: _showSetupNutritionDialog,
-                              icon: Icon(Icons.tune, size: 16, color: accentCyan),
-                              label: Text("Ajuster", style: TextStyle(color: accentCyan, fontWeight: FontWeight.bold, fontSize: 13)),
+                              icon: Icon(Icons.tune_rounded, size: 14, color: accentGold),
+                              label: Text("Ajuster", style: TextStyle(color: accentGold, fontWeight: FontWeight.bold, fontSize: 12, fontFamily: 'Inter')),
                             )
                           ],
                         ),
@@ -469,9 +514,9 @@ class _NutritionScreenState extends State<NutritionScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text("P: ${_targetProt}g", style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
-                            Text("G: ${_targetCarbs}g", style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 13)),
-                            Text("L: ${_targetLipids}g", style: const TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold, fontSize: 13)),
+                            Text("P: ${_targetProt}g", style: TextStyle(color: accentGold, fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'Inter')),
+                            Text("G: ${_targetCarbs}g", style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'Inter')),
+                            Text("L: ${_targetLipids}g", style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'Inter')),
                           ],
                         )
                       ],
@@ -484,39 +529,41 @@ class _NutritionScreenState extends State<NutritionScreen> {
                     height: 48,
                     child: ElevatedButton.icon(
                       onPressed: _showCreateMealWithCalculator,
-                      icon: const Icon(Icons.calculate_outlined),
-                      style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                      label: const Text("Composer un plat (au gramme)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      icon: Icon(Icons.calculate_outlined, size: 18, color: bgColor),
+                      style: ElevatedButton.styleFrom(backgroundColor: accentGold, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                      label: Text("Composer un plat (au gramme)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: bgColor, fontFamily: 'Inter')),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
 
-                  Text("MES PLATS ENREGISTRÉS", style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  Text("MES PLATS ENREGISTRÉS", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8, fontFamily: 'Inter')),
                   const SizedBox(height: 12),
 
                   Expanded(
                     child: _customMeals.isEmpty
-                        ? Center(child: Text("Aucun plat enregistré.\nClique en haut pour composer ta première recette !", style: TextStyle(color: textMuted, fontSize: 14), textAlign: TextAlign.center))
+                        ? Center(child: Text("Aucun plat enregistré.\nClique en haut pour composer ta première recette !", style: TextStyle(color: textMuted, fontSize: 13, fontFamily: 'Inter'), textAlign: TextAlign.center))
                         : ListView.builder(
                             itemCount: _customMeals.length,
+                            key: const PageStorageKey('custom_meals_list'),
                             itemBuilder: (context, index) {
                               final meal = _customMeals[index];
                               return Card(
                                 color: cardColor,
-                                margin: const EdgeInsets.symmetric(vertical: 6),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                margin: const EdgeInsets.symmetric(vertical: 5),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                                 child: ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  title: Text(meal.name, style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 16)),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                  title: Text(meal.name, style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 15, fontFamily: 'Inter')),
                                   subtitle: Padding(
-                                    padding: const EdgeInsets.only(top: 6.0),
+                                    padding: const EdgeInsets.only(top: 2.0),
                                     child: Text(
                                       "${meal.kcal} kcal  |  P: ${meal.prot}g  |  G: ${meal.carbs}g  |  L: ${meal.lipids}g",
-                                      style: TextStyle(color: textMuted, fontSize: 13),
+                                      style: TextStyle(color: textMuted, fontSize: 12, fontFamily: 'Inter'),
                                     ),
                                   ),
                                   trailing: IconButton(
-                                    icon: Icon(Icons.add_circle_outline, color: accentCyan, size: 28),
+                                    icon: Icon(Icons.add_circle_outline_rounded, color: accentGold, size: 22),
                                     onPressed: () => _addMacrosToToday(meal.kcal, meal.prot, meal.carbs, meal.lipids),
                                   ),
                                 ),
@@ -528,5 +575,19 @@ class _NutritionScreenState extends State<NutritionScreen> {
               ),
             ),
     );
+  }
+}
+
+class ListTypeIcon extends StatelessWidget {
+  final Widget leading;
+  final Widget title;
+  final Widget subtitle;
+  final VoidCallback onTap;
+
+  const ListTypeIcon({super.key, required this.leading, required this.title, required this.subtitle, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(leading: leading, title: title, subtitle: subtitle, onTap: onTap);
   }
 }

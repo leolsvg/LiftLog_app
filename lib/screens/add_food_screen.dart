@@ -14,7 +14,7 @@ class AddFoodScreen extends StatefulWidget {
 
 class _AddFoodScreenState extends State<AddFoodScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _weightController = TextEditingController(); // 👈 Controller dédié à la pesée
+  final TextEditingController _weightController = TextEditingController(); 
   static const Duration _searchCacheTtl = Duration(hours: 12);
   
   List<FoodItem> _searchResults = [];
@@ -24,16 +24,16 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
 
   List<Map<String, dynamic>> _savedCustomMeals = [];
 
-  // --- Palette de couleurs LiftLog (Thème sombre) ---
-  final Color bgColor = const Color(0xFF13171C);
-  final Color cardColor = const Color(0xFF1F252D);
-  final Color accentCyan = const Color(0xFF38B6FF);
+  // --- Palette de couleurs GAIN (Or & Anthracite) ---
+  final Color bgColor = const Color(0xFF191919);
+  final Color cardColor = const Color(0xFF242424);
+  final Color accentGold = const Color(0xFFC7AA0C);
   final Color textMain = Colors.white;
   final Color textMuted = const Color(0xFFA0AAB5);
 
   // En-tête strict imposé par la charte d'utilisation de l'API Open Food Facts
   final Map<String, String> _apiHeaders = {
-    'User-Agent': 'LiftLog - Android - Version 1.1.0 - Contact: developer.leo.cherbourg@gmail.com',
+    'User-Agent': 'GAIN - Android - Version 1.1.0 - Contact: developer.leo.cherbourg@gmail.com',
     'Accept': 'application/json',
   };
 
@@ -118,7 +118,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       'fields': 'product_name_fr,product_name,nutriments,image_front_small_url',
     });
 
-    // ⚡ Ajout des headers d'authentification utilisateur requis ici
     final response = await http.get(url, headers: _apiHeaders).timeout(const Duration(seconds: 10));
     if (response.statusCode != 200) {
       throw Exception('HTTP ${response.statusCode}');
@@ -199,7 +198,6 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       for (final host in ['world.openfoodfacts.org', 'fr.openfoodfacts.org']) {
         try {
           final url = Uri.https(host, '/api/v0/product/$barcode.json');
-          // ⚡ Authentification injectée également lors de l'appel au scanner de code-barres
           final response = await http.get(url, headers: _apiHeaders).timeout(const Duration(seconds: 10));
 
           if (response.statusCode != 200) {
@@ -247,7 +245,8 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: cardColor,
-        title: Text('Nouveau plat complet', style: TextStyle(color: textMain)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Nouveau plat complet', style: TextStyle(color: textMain, fontSize: 16, fontWeight: FontWeight.bold)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -255,32 +254,57 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
               TextField(
                 controller: nameController,
                 style: TextStyle(color: textMain),
-                decoration: InputDecoration(labelText: "Nom du plat (ex: Bol Avoine)", labelStyle: TextStyle(color: textMuted)),
+                decoration: InputDecoration(
+                  labelText: "Nom du plat (ex: Bol Avoine)", 
+                  labelStyle: TextStyle(color: textMuted),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
+                ),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: kcalController,
                 keyboardType: TextInputType.number,
                 style: TextStyle(color: textMain),
-                decoration: InputDecoration(labelText: "Calories totales (kcal)", labelStyle: TextStyle(color: textMuted), icon: const Icon(Icons.local_fire_department, color: Colors.orange)),
+                decoration: InputDecoration(
+                  labelText: "Calories totales (kcal)", 
+                  labelStyle: TextStyle(color: textMuted),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
+                ),
               ),
               TextField(
                 controller: protController,
                 keyboardType: TextInputType.number,
                 style: TextStyle(color: textMain),
-                decoration: InputDecoration(labelText: "Protéines (g)", labelStyle: TextStyle(color: textMuted), icon: Icon(Icons.fitness_center, color: Colors.redAccent.shade200)),
+                decoration: InputDecoration(
+                  labelText: "Protéines (g)", 
+                  labelStyle: TextStyle(color: textMuted),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
+                ),
               ),
               TextField(
                 controller: carbsController,
                 keyboardType: TextInputType.number,
                 style: TextStyle(color: textMain),
-                decoration: InputDecoration(labelText: "Glucides (g)", labelStyle: TextStyle(color: textMuted), icon: Icon(Icons.grain, color: Colors.greenAccent.shade400)),
+                decoration: InputDecoration(
+                  labelText: "Glucides (g)", 
+                  labelStyle: TextStyle(color: textMuted),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
+                ),
               ),
               TextField(
                 controller: lipidsController,
                 keyboardType: TextInputType.number,
                 style: TextStyle(color: textMain),
-                decoration: InputDecoration(labelText: "Lipides (g)", labelStyle: TextStyle(color: textMuted), icon: Icon(Icons.water_drop, color: Colors.orangeAccent.shade200)),
+                decoration: InputDecoration(
+                  labelText: "Lipides (g)", 
+                  labelStyle: TextStyle(color: textMuted),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
+                ),
               ),
             ],
           ),
@@ -291,7 +315,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
             child: Text('Annuler', style: TextStyle(color: textMuted))
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor),
+            style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: bgColor, elevation: 0),
             onPressed: () {
               if (nameController.text.isNotEmpty && kcalController.text.isNotEmpty) {
                 setState(() {
@@ -330,13 +354,14 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
-        title: Text('Ajouter un aliment', style: TextStyle(color: textMain, fontWeight: FontWeight.bold)),
+        title: Text('AJOUTER UN ALIMENT', style: TextStyle(color: textMain, fontFamily: 'TheSeason', fontSize: 16, letterSpacing: 0.5)),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: true,
         iconTheme: IconThemeData(color: textMain),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16.0), // 👈 On garde uniquement celui-ci
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -345,56 +370,57 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                 Expanded(
                   child: TextField(
                     controller: _searchController,
-                    style: TextStyle(color: textMain),
+                    style: TextStyle(color: textMain, fontFamily: 'Inter'),
                     decoration: InputDecoration(
-                      hintText: 'Ex: Poulet, Pâtes...',
-                      hintStyle: TextStyle(color: textMuted),
+                      hintText: 'Rechercher un aliment...',
+                      hintStyle: TextStyle(color: textMuted, fontSize: 14),
                       filled: true,
                       fillColor: cardColor,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                       suffixIcon: _searchController.text.isNotEmpty 
                         ? IconButton(
-                            icon: const Icon(Icons.clear, color: Colors.grey),
+                            icon: const Icon(Icons.clear, color: Colors.grey, size: 18),
                             onPressed: () {
                               _searchController.clear();
                               _searchByText("");
                             },
                           )
                         : IconButton(
-                            icon: Icon(Icons.search, color: accentCyan),
+                            icon: Icon(Icons.search, color: accentGold, size: 20),
                             onPressed: () => _searchByText(_searchController.text),
                           ),
                     ),
-                    onChanged: (val) {
-                      setState(() {}); 
-                    },
+                    onChanged: (val) => setState(() {}),
                     onSubmitted: _searchByText,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Container(
-                  decoration: BoxDecoration(color: accentCyan, borderRadius: BorderRadius.circular(12)),
+                  height: 48,
+                  width: 48,
+                  decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(12)),
                   child: IconButton(
-                    icon: const Icon(Icons.barcode_reader, color: Colors.white),
+                    icon: Icon(Icons.qr_code_scanner_rounded, color: accentGold, size: 20),
                     onPressed: _scanBarcode,
                   ),
                 )
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
             if (_isLoading)
-              Center(child: Padding(padding: const EdgeInsets.all(20.0), child: CircularProgressIndicator(color: accentCyan))),
+              Center(child: Padding(padding: const EdgeInsets.all(20.0), child: CircularProgressIndicator(color: accentGold, strokeWidth: 2))),
 
             if (!_isLoading && _searchResults.isEmpty && _selectedFood == null) ...[
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text("Mes plats fréquents", style: TextStyle(color: textMain, fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text("Mes plats fréquents", style: TextStyle(color: textMain, fontSize: 15, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                   TextButton.icon(
                     onPressed: _showCreateMealDialog, 
-                    icon: Icon(Icons.add, color: accentCyan, size: 20), 
-                    label: Text("Créer", style: TextStyle(color: accentCyan, fontWeight: FontWeight.bold))
+                    icon: Icon(Icons.add, color: accentGold, size: 16), 
+                    label: Text("Créer", style: TextStyle(color: accentGold, fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'Inter'))
                   )
                 ],
               ),
@@ -404,7 +430,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 40.0),
-                    child: Text("Aucun plat sauvegardé.\nCréez vos plats habituels pour les ajouter plus vite !", textAlign: TextAlign.center, style: TextStyle(color: textMuted)),
+                    child: Text("Aucun plat sauvegardé.\nCréez vos plats habituels pour les ajouter plus vite.", textAlign: TextAlign.center, style: TextStyle(color: textMuted, fontSize: 13, fontFamily: 'Inter')),
                   ),
                 )
               else
@@ -415,27 +441,26 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                       final meal = _savedCustomMeals[index];
                       return Card(
                         color: cardColor,
+                        elevation: 0,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        margin: const EdgeInsets.only(bottom: 12),
+                        margin: const EdgeInsets.only(bottom: 10),
                         child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                           leading: Container(
-                            width: 45, height: 45, 
+                            width: 38, height: 38, 
                             decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8)), 
-                            child: Icon(Icons.restaurant, color: accentCyan)
+                            child: Icon(Icons.restaurant_menu_rounded, color: accentGold, size: 18)
                           ),
-                          title: Text(meal['name'], style: TextStyle(fontWeight: FontWeight.bold, color: textMain, fontSize: 16)),
+                          title: Text(meal['name'], style: TextStyle(fontWeight: FontWeight.bold, color: textMain, fontSize: 15, fontFamily: 'Inter')),
                           subtitle: Padding(
-                            padding: const EdgeInsets.only(top: 4.0),
-                            child: Text('${meal['kcal']} kcal  •  P: ${meal['proteins']}g  •  G: ${meal['carbs']}g  •  L: ${meal['lipids']}g', style: TextStyle(fontSize: 12, color: textMuted)),
+                            padding: const EdgeInsets.only(top: 2.0),
+                            child: Text('${meal['kcal']} kcal  •  P: ${meal['proteins']}g  •  G: ${meal['carbs']}g  •  L: ${meal['lipids']}g', style: TextStyle(fontSize: 11, color: textMuted, fontFamily: 'Inter')),
                           ),
                           trailing: IconButton(
-                            icon: Icon(Icons.delete_outline, color: Colors.redAccent.shade200),
+                            icon: Icon(Icons.remove_circle_outline_rounded, color: Colors.redAccent.shade200, size: 18),
                             onPressed: () => _deleteCustomMeal(index),
                           ),
-                          onTap: () {
-                            Navigator.pop(context, meal);
-                          },
+                          onTap: () => Navigator.pop(context, meal),
                         ),
                       );
                     },
@@ -451,14 +476,24 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                     final food = _searchResults[index];
                     return Card(
                       color: cardColor,
+                      elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
-                        leading: food.imageUrl != null 
-                            ? ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(food.imageUrl!, width: 40, height: 40, fit: BoxFit.cover))
-                            : Container(width: 40, height: 40, decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8)), child: Icon(Icons.fastfood, color: textMuted)),
-                        title: Text(food.name, style: TextStyle(fontWeight: FontWeight.bold, color: textMain)),
-                        subtitle: Text('${food.kcalPer100g.round()} kcal / 100g', style: TextStyle(fontSize: 13, color: textMuted)),
-                        trailing: Icon(Icons.add_circle_outline, color: accentCyan),
+                        leading: Container(
+                          width: 38, 
+                          height: 38, 
+                          decoration: BoxDecoration(
+                            color: bgColor, 
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: food.imageUrl != null 
+                              ? ClipRRect(borderRadius: BorderRadius.circular(6), child: Image.network(food.imageUrl!, width: 38, height: 38, fit: BoxFit.cover))
+                              : Icon(Icons.fastfood_rounded, color: textMuted, size: 16),
+                        ),
+                        title: Text(food.name, style: TextStyle(fontWeight: FontWeight.bold, color: textMain, fontSize: 14, fontFamily: 'Inter')),
+                        subtitle: Text('${food.kcalPer100g.round()} kcal / 100g', style: TextStyle(fontSize: 12, color: textMuted, fontFamily: 'Inter')),
+                        trailing: Icon(Icons.add_circle_outline_rounded, color: accentGold, size: 20),
                         onTap: () {
                           setState(() {
                             _selectedFood = food;
@@ -476,76 +511,78 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
             if (_selectedFood != null) ...[
               Card(
                 color: cardColor,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: accentCyan, width: 1.5)),
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: accentGold.withValues(alpha: 0.3), width: 1.0)),
                 child: Padding(
-                  padding: const EdgeInsets.all(20.0),
+                  padding: const EdgeInsets.all(16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Expanded(child: Text(_selectedFood!.name, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textMain))),
+                          Expanded(child: Text(_selectedFood!.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textMain, fontFamily: 'Inter'))),
                           IconButton(
-                            icon: Icon(Icons.close, color: textMuted),
+                            icon: Icon(Icons.close_rounded, color: textMuted, size: 20),
                             onPressed: () => setState(() => _selectedFood = null),
                           )
                         ],
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       
-                      Text('Quantité pesée :', style: TextStyle(fontSize: 14, color: textMuted)),
-                      const SizedBox(height: 12),
+                      Text('Quantité pesée :', style: TextStyle(fontSize: 13, color: textMuted, fontFamily: 'Inter')),
+                      const SizedBox(height: 10),
                       Row(
                         children: [
                           Expanded(
-                            child: TextField(
-                              controller: _weightController, // 👈 Fixé : Utilise le controller persistant
-                              keyboardType: TextInputType.number,
-                              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textMain),
-                              textAlign: TextAlign.center,
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: bgColor,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                                contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                            child: Container(
+                              height: 46,
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10)),
+                              child: TextFormField(
+                                controller: _weightController,
+                                keyboardType: TextInputType.number,
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textMain, fontFamily: 'Inter'),
+                                textAlign: TextAlign.center,
+                                decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.zero),
+                                onChanged: (val) {
+                                  setState(() {
+                                    _currentWeight = double.tryParse(val) ?? 0.0;
+                                  });
+                                },
                               ),
-                              onChanged: (val) {
-                                setState(() {
-                                  _currentWeight = double.tryParse(val) ?? 0.0;
-                                });
-                              },
                             ),
                           ),
-                          const SizedBox(width: 15),
-                          Text('grammes', style: TextStyle(fontSize: 18, color: textMuted, fontWeight: FontWeight.w500)),
+                          const SizedBox(width: 16),
+                          Text('grammes', style: TextStyle(fontSize: 15, color: textMuted, fontWeight: FontWeight.w500, fontFamily: 'Inter')),
                         ],
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 24),
 
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildMacroCircle('Kcal', currentMacros['kcal']!, accentCyan),
-                  _buildMacroCircle('Prot', currentMacros['proteins']!, Colors.redAccent.shade200),
-                  _buildMacroCircle('Gluc', currentMacros['carbs']!, Colors.greenAccent.shade400),
-                  _buildMacroCircle('Lip', currentMacros['lipids']!, Colors.orangeAccent.shade200),
+                  _buildMacroCircle('Kcal', currentMacros['kcal']!, accentGold),
+                  _buildMacroCircle('Prot', currentMacros['proteins']!, textMain),
+                  _buildMacroCircle('Gluc', currentMacros['carbs']!, textMain),
+                  _buildMacroCircle('Lip', currentMacros['lipids']!, textMain),
                 ],
               ),
               const Spacer(),
 
               SizedBox(
                 width: double.infinity,
-                height: 55,
+                height: 52,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: accentCyan, 
+                    backgroundColor: accentGold, 
                     foregroundColor: bgColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))
                   ),
                   onPressed: () {
                     Navigator.pop(context, {
@@ -556,13 +593,13 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
                       'lipids': currentMacros['lipids'],
                     });
                   },
-                  child: const Text('Ajouter au journal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                  child: const Text('Ajouter au journal', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, fontFamily: 'Inter')),
                 ),
               )
             ]
           ],
         ),
-      ),
+      ), // 🦾 Ici, le deuxième "padding:" en trop a été supprimé proprement
     );
   }
 
@@ -570,13 +607,17 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     return Column(
       children: [
         Container(
-          width: 65,
-          height: 65,
-          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: color, width: 3), color: cardColor),
-          child: Center(child: Text('$value', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: textMain))),
+          width: 58,
+          height: 58,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle, 
+            border: Border.all(color: color == textMain ? Colors.grey.shade800 : color, width: 2), 
+            color: cardColor
+          ),
+          child: Center(child: Text('$value', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textMain, fontFamily: 'Inter'))),
         ),
-        const SizedBox(height: 10),
-        Text(label, style: TextStyle(color: textMuted, fontWeight: FontWeight.w600, fontSize: 14)),
+        const SizedBox(height: 8),
+        Text(label, style: TextStyle(color: textMuted, fontWeight: FontWeight.w600, fontSize: 12, fontFamily: 'Inter')),
       ],
     );
   }

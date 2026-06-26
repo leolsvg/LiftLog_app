@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/nutrition_model.dart';
 import 'add_food_screen.dart';
@@ -18,7 +17,7 @@ class _KcalTabState extends State<KcalTab> {
   final UserProfile _profile = UserProfile(
     weight: 80.0, 
     height: 180.0, 
-    age: 20, // Reste calé sur tes données réelles de profil
+    age: 20, 
     gender: "Homme",
     activityFactor: 1.55, 
     caloriesOffset: 300, 
@@ -41,11 +40,14 @@ class _KcalTabState extends State<KcalTab> {
     "Extra / Collation": [],
   };
 
-  final Color bgColor = const Color(0xFF13171C);
-  final Color cardColor = const Color(0xFF1F252D);
-  final Color accentCyan = const Color(0xFF38B6FF);
+  // --- Palette de couleurs GAIN (Or & Anthracite unifié) ---
+  final Color bgColor = const Color(0xFF191919);
+  final Color cardColor = const Color(0xFF242424);
+  final Color accentGold = const Color(0xFFC7AA0C);
   final Color textMain = Colors.white;
   final Color textMuted = const Color(0xFFA0AAB5);
+
+ 
 
   @override
   void initState() {
@@ -58,7 +60,6 @@ class _KcalTabState extends State<KcalTab> {
     await _loadNutritionFromSupabase();
   }
 
-  // ☁️ ENVOIE TOUT LE JOURNAL ET LES MACROS SUR SUPABASE
   Future<void> _syncNutritionToSupabase() async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
@@ -88,7 +89,7 @@ class _KcalTabState extends State<KcalTab> {
         'consumed_prot': totalProt,
         'consumed_carbs': totalCarbs,
         'consumed_lipids': totalLipids,
-        'meals_json': _mealFoods, // 💾 Sauvegarde la structure complète de la journée au format JSON
+        'meals_json': _mealFoods, 
       });
       debugPrint("🔥 Nutrition entièrement sauvegardée sur le Cloud !");
     } catch (e) {
@@ -126,7 +127,6 @@ class _KcalTabState extends State<KcalTab> {
     }
   }
 
-  // ☁️ RÉCUPÈRE LE JOURNAL DEPUIS LE CLOUD TIMÉ SUR AUJOURD'HUI
   Future<void> _loadNutritionFromSupabase() async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
@@ -155,7 +155,6 @@ class _KcalTabState extends State<KcalTab> {
               if (decodedMeals.containsKey(meal)) {
                 _mealFoods[meal] = List<Map<String, dynamic>>.from(decodedMeals[meal]);
                 
-                // On recalcule les calories par repas
                 int mealKcal = 0;
                 for (var food in _mealFoods[meal]!) {
                   mealKcal += (food['kcal'] ?? 0) as int;
@@ -166,7 +165,6 @@ class _KcalTabState extends State<KcalTab> {
           }
         });
       } else {
-        // Si aucune donnée pour aujourd'hui, on initialise une journée propre à 0
         _resetLocalStateData();
       }
     } catch (e) {
@@ -202,19 +200,19 @@ class _KcalTabState extends State<KcalTab> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTypeIcon(
-                leading: Icon(Icons.auto_awesome, color: accentCyan),
-                title: Text("Calculateur guidé (Objectif de poids)", style: TextStyle(color: textMain, fontWeight: FontWeight.bold)),
-                subtitle: const Text("Formule adaptative étape par étape", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                leading: Icon(Icons.auto_awesome, color: accentGold),
+                title: Text("Calculateur guidé (Objectif de poids)", style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
+                subtitle: Text("Formule adaptative étape par étape", style: TextStyle(color: textMuted, fontSize: 12, fontFamily: 'Inter')),
                 onTap: () {
                   Navigator.pop(context);
                   _redirectToWizardSetup();
                 },
               ),
-              Divider(color: Colors.grey.shade800, height: 1),
+              Divider(color: Colors.grey.shade900, height: 1),
               ListTypeIcon(
-                leading: Icon(Icons.edit_note, color: accentCyan),
-                title: Text("Modification manuelle des macros", style: TextStyle(color: textMain, fontWeight: FontWeight.bold)),
-                subtitle: const Text("Rentre tes propres objectifs directement", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                leading: Icon(Icons.edit_note, color: accentGold),
+                title: Text("Modification manuelle des macros", style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
+                subtitle: Text("Rentre tes propres objectifs directement", style: TextStyle(color: textMuted, fontSize: 12, fontFamily: 'Inter')),
                 onTap: () {
                   Navigator.pop(context);
                   _showManualEditDialog();
@@ -237,20 +235,21 @@ class _KcalTabState extends State<KcalTab> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: cardColor,
-        title: Text("Objectifs manuels", style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text("Objectifs manuels", style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Inter')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: kcalController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Calories cibles (kcal)", labelStyle: TextStyle(color: textMuted))),
-            TextField(controller: protController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Protéines cibles (g)", labelStyle: TextStyle(color: textMuted))),
-            TextField(controller: carbsController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Glucides cibles (g)", labelStyle: TextStyle(color: textMuted))),
-            TextField(controller: lipidsController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Lipides cibles (g)", labelStyle: TextStyle(color: textMuted))),
+            TextField(controller: kcalController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Calories cibles (kcal)", labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)), focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)))),
+            TextField(controller: protController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Protéines cibles (g)", labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)), focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)))),
+            TextField(controller: carbsController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Glucides cibles (g)", labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)), focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)))),
+            TextField(controller: lipidsController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Lipides cibles (g)", labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)), focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)))),
           ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: Text("Annuler", style: TextStyle(color: textMuted))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor),
+            style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: bgColor, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
             onPressed: () async {
               final user = _supabase.auth.currentUser;
               if (user == null) return;
@@ -322,14 +321,14 @@ class _KcalTabState extends State<KcalTab> {
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
-        title: Text("Nutrition", style: TextStyle(color: textMain, fontWeight: FontWeight.bold)),
+        title: Text("NUTRITION", style: TextStyle(color: textMain, fontFamily: 'TheSeason', fontSize: 16, letterSpacing: 0.5)),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        centerTitle: false,
+        centerTitle: true,
         actions: [
           IconButton(
             tooltip: 'Ajuster mes objectifs',
-            icon: Icon(Icons.tune, color: textMain),
+            icon: Icon(Icons.tune_rounded, color: textMain, size: 20),
             onPressed: _showAjustementOptions,
           )
         ],
@@ -340,17 +339,17 @@ class _KcalTabState extends State<KcalTab> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildTopCounters(),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
 
-            Text("Journal du jour", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textMain)),
-            const SizedBox(height: 16),
+            Text("Journal du jour", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textMain, fontFamily: 'Inter')),
+            const SizedBox(height: 12),
             
             _buildMealRectangle(title: "Petit-déjeuner", icon: Icons.free_breakfast_outlined, kcal: _mealCalories["Petit-déjeuner"]!, foods: _mealFoods["Petit-déjeuner"]!),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             _buildMealRectangle(title: "Déjeuner", icon: Icons.lunch_dining_outlined, kcal: _mealCalories["Déjeuner"]!, foods: _mealFoods["Déjeuner"]!),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             _buildMealRectangle(title: "Dîner", icon: Icons.dinner_dining_outlined, kcal: _mealCalories["Dîner"]!, foods: _mealFoods["Dîner"]!),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             _buildMealRectangle(title: "Extra / Collation", icon: Icons.cookie_outlined, kcal: _mealCalories["Extra / Collation"]!, foods: _mealFoods["Extra / Collation"]!),
           ],
         ),
@@ -368,29 +367,28 @@ class _KcalTabState extends State<KcalTab> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildKcalStat("Consommé", eaten.toString(), textMain),
-              Container(width: 1, height: 40, color: Colors.grey.shade800),
-              _buildKcalStat("Restant", remaining > 0 ? remaining.toString() : "0", accentCyan),
+              Container(width: 1, height: 35, color: Colors.grey.shade900),
+              _buildKcalStat("Restant", remaining > 0 ? remaining.toString() : "0", accentGold),
             ],
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0),
-            child: Divider(color: Colors.grey.shade800),
+            padding: const EdgeInsets.symmetric(vertical: 14.0),
+            child: Divider(color: Colors.grey.shade900, height: 1),
           ),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildMacroStat("Protéines", _todayNutrition.proteins.toDouble(), macros["proteins"]!.toDouble(), Colors.redAccent.shade200),
-              _buildMacroStat("Glucides", _todayNutrition.carbs.toDouble(), macros["carbs"]!.toDouble(), accentCyan),
-              _buildMacroStat("Lipides", _todayNutrition.lipids.toDouble(), macros["lipids"]!.toDouble(), Colors.orangeAccent.shade200),
+              _buildMacroStat("Protéines", _todayNutrition.proteins.toDouble(), macros["proteins"]!.toDouble(), accentGold),
+              _buildMacroStat("Glucides", _todayNutrition.carbs.toDouble(), macros["carbs"]!.toDouble(), textMain),
+              _buildMacroStat("Lipides", _todayNutrition.lipids.toDouble(), macros["lipids"]!.toDouble(), textMain),
             ],
           ),
         ],
@@ -401,8 +399,9 @@ class _KcalTabState extends State<KcalTab> {
   Widget _buildKcalStat(String label, String value, Color valueColor) {
     return Column(
       children: [
-        Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: valueColor)),
-        Text(label, style: TextStyle(fontSize: 14, color: textMuted)),
+        Text(value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: valueColor, fontFamily: 'Inter', letterSpacing: -0.5)),
+        const SizedBox(height: 2),
+        Text(label, style: TextStyle(fontSize: 12, color: textMuted, fontFamily: 'Inter')),
       ],
     );
   }
@@ -411,17 +410,17 @@ class _KcalTabState extends State<KcalTab> {
     double progress = total > 0 ? (eaten / total) : 0;
     return Column(
       children: [
-        Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textMain)),
+        Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textMain, fontFamily: 'Inter')),
         const SizedBox(height: 4),
-        Text("${eaten.toInt()} / ${total.toInt()}g", style: TextStyle(fontSize: 12, color: textMuted)),
+        Text("${eaten.toInt()} / ${total.toInt()}g", style: TextStyle(fontSize: 11, color: textMuted, fontFamily: 'Inter')),
         const SizedBox(height: 8),
         SizedBox(
-          width: 80,
+          width: 75,
           child: LinearProgressIndicator(
             value: progress.clamp(0.0, 1.0),
-            backgroundColor: Colors.black38,
+            backgroundColor: color == accentGold ? color.withValues(alpha:0.08) : Colors.grey.shade900,
             color: color,
-            minHeight: 6,
+            minHeight: 3.5,
             borderRadius: BorderRadius.circular(10),
           ),
         )
@@ -434,8 +433,7 @@ class _KcalTabState extends State<KcalTab> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 2))],
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -445,29 +443,29 @@ class _KcalTabState extends State<KcalTab> {
             children: [
               Row(
                 children: [
-                  Icon(icon, color: accentCyan),
-                  const SizedBox(width: 12),
-                  Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textMain)),
+                  Icon(icon, color: accentGold, size: 18),
+                  const SizedBox(width: 10),
+                  Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textMain, fontFamily: 'Inter')),
                 ],
               ),
               IconButton(
                 onPressed: () => _navigateToAddFood(title),
-                icon: Icon(Icons.add_circle, color: accentCyan),
-                iconSize: 32,
+                icon: Icon(Icons.add_circle_outline_rounded, color: accentGold),
+                iconSize: 22,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               )
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
             kcal > 0 ? "$kcal kcal consommées" : "Ajouter des aliments",
-            style: TextStyle(color: kcal > 0 ? accentCyan : textMuted, fontSize: 14, fontWeight: kcal > 0 ? FontWeight.bold : FontWeight.normal),
+            style: TextStyle(color: kcal > 0 ? accentGold : textMuted, fontSize: 12, fontWeight: kcal > 0 ? FontWeight.bold : FontWeight.normal, fontFamily: 'Inter'),
           ),
           if (foods.isNotEmpty) ...[
             const SizedBox(height: 12),
-            const Divider(color: Colors.white24),
-            const SizedBox(height: 8),
+            Divider(color: Colors.grey.shade900, height: 1),
+            const SizedBox(height: 6),
             ...foods.map((food) {
               final String foodKey = "${food['name']}_${foods.indexOf(food)}";
               
@@ -476,12 +474,12 @@ class _KcalTabState extends State<KcalTab> {
                 direction: DismissDirection.endToStart,
                 background: Container(
                   alignment: Alignment.centerRight,
-                  padding: const EdgeInsets.only(right: 20.0),
+                  padding: const EdgeInsets.only(right: 16.0),
                   decoration: BoxDecoration(
-                    color: Colors.redAccent.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(10),
+                    color: Colors.redAccent.withValues(alpha:0.15),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.delete_outline, color: Colors.white, size: 22),
+                  child: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
                 ),
                 onDismissed: (direction) {
                   setState(() {
@@ -494,12 +492,12 @@ class _KcalTabState extends State<KcalTab> {
                     foods.remove(food);
                   });
                   
-                  _syncNutritionToSupabase(); // Aligné directement en ligne après suppression
+                  _syncNutritionToSupabase();
 
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text("${food['name']} supprimé"),
-                      backgroundColor: Colors.redAccent,
+                      content: Text("${food['name']} supprimé", style: const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold)),
+                      backgroundColor: cardColor,
                       duration: const Duration(seconds: 2),
                     ),
                   );
@@ -509,8 +507,8 @@ class _KcalTabState extends State<KcalTab> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(food['name'], style: TextStyle(color: textMain, fontSize: 15)),
-                      Text("${food['kcal']} kcal", style: TextStyle(color: textMuted, fontSize: 14)),
+                      Text(food['name'], style: TextStyle(color: textMain, fontSize: 14, fontFamily: 'Inter')),
+                      Text("${food['kcal']} kcal", style: TextStyle(color: textMuted, fontSize: 13, fontFamily: 'Inter')),
                     ],
                   ),
                 ),
@@ -523,7 +521,6 @@ class _KcalTabState extends State<KcalTab> {
   }
 }
 
-// Remplacement temporaire pour compilation propre si besoin
 class ListTypeIcon extends StatelessWidget {
   final Widget leading;
   final Widget title;

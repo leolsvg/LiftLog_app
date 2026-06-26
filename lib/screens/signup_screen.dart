@@ -17,9 +17,10 @@ class _SignupScreenState extends State<SignupScreen> {
 
   final _supabase = Supabase.instance.client;
 
-  // Signatures Design LiftLog Luxe
-  final Color bgColor = const Color(0xFF13171C);
-  final Color accentCyan = const Color(0xFF38B6FF);
+  // Signatures Design GAIN - Or & Anthracite
+  final Color bgColor = const Color(0xFF191919);
+  final Color cardColor = const Color(0xFF242424);
+  final Color accentGold = const Color(0xFFC7AA0C);
   final Color textMain = Colors.white;
   final Color textMuted = const Color(0xFFA0AAB5);
 
@@ -46,10 +47,14 @@ class _SignupScreenState extends State<SignupScreen> {
 
     if (password != confirmPassword) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Les mots de passe ne correspondent pas'), backgroundColor: Colors.redAccent),
+        const SnackBar(content: Text('Les mots de passe ne correspondent pas'), backgroundColor: Colors.redAccent),
       );
       return;
     }
+
+    // On capture les instances de l'UI AVANT le await pour éviter les async gaps
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
 
     setState(() => _isLoading = true);
 
@@ -58,18 +63,24 @@ class _SignupScreenState extends State<SignupScreen> {
         email: email,
         password: password,
       );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Inscription réussie !'), backgroundColor: Colors.green),
-        );
-        Navigator.pop(context); // Retour à l'écran de connexion
-      }
+      
+      if (!context.mounted) return; 
+      
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Inscription réussie !'), backgroundColor: Colors.green),
+      );
+      navigator.pop(); 
+      
     } on AuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!context.mounted) return; 
+      
+      messenger.showSnackBar(
         SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!context.mounted) return; 
+      
+      messenger.showSnackBar(
         const SnackBar(content: Text('Une erreur inattendue est survenue'), backgroundColor: Colors.redAccent),
       );
     } finally {
@@ -79,13 +90,15 @@ class _SignupScreenState extends State<SignupScreen> {
 
   // Inscription Sociale (Apple)
   Future<void> _handleSocialSignIn(OAuthProvider provider) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       await _supabase.auth.signInWithOAuth(
         provider,
-        redirectTo: 'com.tonnom.liftlog://login-callback', // Aligné sur ton LoginScreen
+        redirectTo: 'com.tonnom.liftlog://login-callback', 
       );
     } on AuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!context.mounted) return; 
+      messenger.showSnackBar(
         SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
       );
     }
@@ -111,10 +124,9 @@ class _SignupScreenState extends State<SignupScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // 🖼️ TON MINI LOGO DISCRET EN EN-TÊTE
                 Image.asset(
-                  'assets/img/min_logo.png',
-                  height: 45,
+                  'assets/img/logo_trans.png',
+                  height: 100,
                   fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 20),
@@ -142,7 +154,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     labelStyle: TextStyle(color: textMuted),
                     prefixIcon: Icon(Icons.email_outlined, color: textMuted),
                     enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800), borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentCyan), borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentGold), borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -157,7 +169,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     labelStyle: TextStyle(color: textMuted),
                     prefixIcon: Icon(Icons.lock_outlined, color: textMuted),
                     enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800), borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentCyan), borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentGold), borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -172,7 +184,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     labelStyle: TextStyle(color: textMuted),
                     prefixIcon: Icon(Icons.lock_reset_outlined, color: textMuted),
                     enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800), borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentCyan), borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentGold), borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -181,7 +193,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleEmailSignUp,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: accentCyan,
+                    backgroundColor: accentGold,
                     foregroundColor: bgColor,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 16),

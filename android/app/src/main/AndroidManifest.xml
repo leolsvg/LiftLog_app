@@ -10,7 +10,7 @@
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" tools:node="replace" />
 
     <application
-        android:label="LiftLog"
+        android:label="GAIN"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         
@@ -38,7 +38,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="myfitnessapp" android:host="login-callback" />
+                <data android:scheme="com.lrenou.liftlog" android:host="login-callback" />
             </intent-filter>
 
         </activity>

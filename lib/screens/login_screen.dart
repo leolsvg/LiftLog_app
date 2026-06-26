@@ -17,9 +17,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final _supabase = Supabase.instance.client;
 
-  // Signatures Design LiftLog
-  final Color bgColor = const Color(0xFF13171C);
-  final Color accentCyan = const Color(0xFF38B6FF);
+  // Signatures Design GAIN - Or & Anthracite
+  final Color bgColor = const Color(0xFF191919);
+  final Color cardColor = const Color(0xFF242424);
+  final Color accentGold = const Color(0xFFC7AA0C);
+  final Color textMain = Colors.white;
   final Color textMuted = const Color(0xFFA0AAB5);
 
   @override
@@ -47,6 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
         email: email,
         password: password,
       );
+      if (!mounted) return;
     } on AuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
@@ -84,10 +87,10 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // 🖼️ TON NOUVEAU LOGO PREMIUM
+                // 🖼️ TON NOUVEAU LOGO PREMIUM DÉTOURÉ
                 Image.asset(
-                  'assets/img/logo.png',
-                  height: 80, // Hauteur ajustée pour un look sobre et pro
+                  'assets/img/logo_trans.png',
+                  height: 100,
                   fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 16),
@@ -109,7 +112,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     labelStyle: TextStyle(color: textMuted),
                     prefixIcon: Icon(Icons.email_outlined, color: textMuted),
                     enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800), borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentCyan), borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentGold), borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -124,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     labelStyle: TextStyle(color: textMuted),
                     prefixIcon: Icon(Icons.lock_outlined, color: textMuted),
                     enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800), borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentCyan), borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: accentGold), borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -133,7 +136,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleEmailSignIn,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: accentCyan,
+                    backgroundColor: accentGold,
                     foregroundColor: bgColor,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -176,7 +179,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: () {
                         Navigator.push(context, MaterialPageRoute(builder: (context) => const SignupScreen()));
                       },
-                      child: Text("S'inscrire", style: TextStyle(color: accentCyan, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
+                      child: Text("S'inscrire", style: TextStyle(color: accentGold, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                     ),
                   ],
                 ),

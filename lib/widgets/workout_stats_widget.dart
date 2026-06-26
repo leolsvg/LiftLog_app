@@ -85,7 +85,7 @@ class _WorkoutStatsWidgetState extends State<WorkoutStatsWidget> {
         decoration: BoxDecoration(
           color: cardColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade800.withOpacity(0.5)),
+          border: Border.all(color: Colors.grey.shade800.withValues(alpha:0.5)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,

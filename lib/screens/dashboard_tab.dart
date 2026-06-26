@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/weight_chart.dart';
 import '../widgets/consistency_tracker.dart';
 import 'account_screen.dart';
-import 'history_tab.dart';
 
 class DashboardTab extends StatefulWidget {
   final String nextSessionName;
@@ -20,18 +19,19 @@ class DashboardTab extends StatefulWidget {
 }
 
 class _DashboardTabState extends State<DashboardTab> {
-  // Styles & Palette Signatures
-  final Color bgColor = const Color(0xFF13171C);
-  final Color cardColor = const Color(0xFF1F252D);
-  final Color accentCyan = const Color(0xFF38B6FF);
+  // Signatures Design GAIN - Or & Anthracite
+  final Color bgColor = const Color(0xFF191919);
+  final Color cardColor = const Color(0xFF242424);
+  final Color accentGold = const Color(0xFFC7AA0C);
   final Color textMain = Colors.white;
   final Color textMuted = const Color(0xFFA0AAB5);
 
-  final User? user = Supabase.instance.client.auth.currentUser;
   final supabase = Supabase.instance.client;
+  User? user; 
 
   String _averageDurationText = "Calcul...";
   bool _isLoading = true;
+  bool _isFetchingData = false; 
   
   // Objectifs cibles (user_profiles)
   int _targetKcal = 2500;
@@ -39,7 +39,7 @@ class _DashboardTabState extends State<DashboardTab> {
   int _targetCarbs = 250;
   int _targetLipids = 80;
   
-  // Consommation réelle du jour (daily_nutrition) connectée
+  // Consommation réelle du jour (daily_nutrition)
   int _consumedKcal = 0;
   int _consumedProt = 0;
   int _consumedCarbs = 0;
@@ -52,16 +52,32 @@ class _DashboardTabState extends State<DashboardTab> {
   @override
   void initState() {
     super.initState();
+    user = supabase.auth.currentUser;
     _fetchSessionAverageDuration();
     _loadAllData();
   }
 
   Future<void> _loadAllData() async {
-    setState(() => _isLoading = true);
-    await _loadProfileData();
-    await _loadNutritionData();
-    if (mounted) {
-      setState(() => _isLoading = false);
+    if (user == null || _isFetchingData) {
+      if (mounted && user == null) setState(() => _isLoading = false);
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _isFetchingData = true; 
+    });
+
+    try {
+      await _loadProfileData();
+      await _loadNutritionData();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isFetchingData = false; 
+        });
+      }
     }
   }
 
@@ -210,13 +226,15 @@ class _DashboardTabState extends State<DashboardTab> {
               if (w != null) _saveWeightToSupabase(w, t ?? 0.0);
               Navigator.pop(context);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+            style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: bgColor, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
             child: const Text('Confirmer', style: TextStyle(fontWeight: FontWeight.bold)),
           )
         ],
       ),
     );
   }
+
+  // ... (Tout le début de ton fichier reste identique)
 
   @override
   Widget build(BuildContext context) {
@@ -228,29 +246,42 @@ class _DashboardTabState extends State<DashboardTab> {
       backgroundColor: bgColor,
       body: SafeArea(
         child: _isLoading 
-            ? Center(child: CircularProgressIndicator(color: accentCyan, strokeWidth: 2))
+            ? Center(child: CircularProgressIndicator(color: accentGold, strokeWidth: 2))
             : RefreshIndicator(
-                color: accentCyan,
+                color: accentGold,
                 backgroundColor: cardColor,
                 onRefresh: _loadAllData,
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+                  // 📐 ÉTAPE 1 : Réduction du padding vertical global de la page (de 10.0 à 0.0 en haut)
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0).copyWith(top: 0.0, bottom: 10.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // --- HEADER ---
+                      // --- HEADER AVEC TON LOGO GAIN AJUSTÉ ---
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 24.0, top: 10.0),
+                        // 📐 ÉTAPE 2 : Nettoyage des grosses marges (24.0 en bas passe à 8.0 pour coller le contenu)
+                        padding: const EdgeInsets.only(bottom: 8.0, top: 0.0),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center, // Aligne verticalement le logo et le profil
                           children: [
-                            Text('Accueil', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: textMain, letterSpacing: -0.5)),
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              icon: Icon(Icons.account_circle_outlined, color: textMuted, size: 26),
-                              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountScreen())).then((_) => _loadAllData()),
+                            Image.asset(
+                              'assets/img/min_logo.png',
+                              height: 100, 
+                              // 📐 ÉTAPE 3 : Alignement à gauche et coupure des espaces transparents fantômes
+                              alignment: Alignment.centerLeft,
+                              fit: BoxFit.contain, 
+                            ),
+                            // 📐 ÉTAPE 4 : Un petit décalage vers le haut pour l'icône profil pour équilibrer avec le grand logo
+                            Transform.translate(
+                              offset: const Offset(0, -10),
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                icon: Icon(Icons.account_circle_outlined, color: textMuted, size: 26),
+                                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountScreen())).then((_) => _loadAllData()),
+                              ),
                             ),
                           ],
                         ),
@@ -262,7 +293,7 @@ class _DashboardTabState extends State<DashboardTab> {
                         decoration: BoxDecoration(
                           color: cardColor,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: accentCyan.withOpacity(0.25), width: 1),
+                          border: Border.all(color: accentGold.withValues(alpha:0.15), width: 1),
                         ),
                         child: Row(
                           children: [
@@ -270,15 +301,15 @@ class _DashboardTabState extends State<DashboardTab> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('PROCHAINE SÉANCE', style: TextStyle(color: textMuted, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)), 
+                                  Text('PROCHAINE SÉANCE', style: TextStyle(color: textMuted, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0, fontFamily: 'Inter')), 
                                   const SizedBox(height: 6), 
-                                  Text(widget.nextSessionName.isEmpty ? "Aucune de planifiée" : widget.nextSessionName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textMain)),
+                                  Text(widget.nextSessionName.isEmpty ? "Aucune de planifiée" : widget.nextSessionName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textMain, fontFamily: 'Inter')),
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
-                                      Icon(Icons.analytics_outlined, size: 13, color: accentCyan),
+                                      Icon(Icons.analytics_outlined, size: 13, color: accentGold),
                                       const SizedBox(width: 6),
-                                      Text(_averageDurationText, style: TextStyle(color: accentCyan, fontSize: 12, fontWeight: FontWeight.bold)),
+                                      Text(_averageDurationText, style: TextStyle(color: accentGold, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                                     ],
                                   ),
                                 ],
@@ -288,25 +319,27 @@ class _DashboardTabState extends State<DashboardTab> {
                             ElevatedButton(
                               onPressed: widget.onStartSession, 
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: accentCyan, 
+                                backgroundColor: accentGold, 
                                 foregroundColor: bgColor,
                                 elevation: 0,
                                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ), 
-                              child: const Text('Lancer', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+                              child: const Text('Lancer', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, fontFamily: 'Inter')),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      // 📐 ÉTAPE 5 : Resserrement des sections (de 24 à 12)
+                      const SizedBox(height: 12),
 
                       // --- RÉGULARITÉ ---
                       const ConsistencyTracker(),
-                      const SizedBox(height: 28),
+                      // 📐 ÉTAPE 6 : Resserrement des sections (de 28 à 16)
+                      const SizedBox(height: 16),
                       
                       // --- NUTRITION SECTION ---
-                      Text('Nutrition du jour', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textMain, letterSpacing: 0.2)),
+                     
                       const SizedBox(height: 12),
                       Container(
                         padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 8.0),
@@ -317,25 +350,26 @@ class _DashboardTabState extends State<DashboardTab> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            _buildCircularMacro('Kcal', _consumedKcal, _targetKcal, accentCyan),
-                            _buildCircularMacro('Prot', _consumedProt, _targetProt, Colors.redAccent.shade200),
-                            _buildCircularMacro('Gluc', _consumedCarbs, _targetCarbs, Colors.greenAccent.shade400),
-                            _buildCircularMacro('Lip', _consumedLipids, _targetLipids, Colors.orangeAccent.shade200),
+                            _buildCircularMacro('Kcal', _consumedKcal, _targetKcal, accentGold),
+                            _buildCircularMacro('Prot', _consumedProt, _targetProt, accentGold),
+                            _buildCircularMacro('Gluc', _consumedCarbs, _targetCarbs, accentGold),
+                            _buildCircularMacro('Lip', _consumedLipids, _targetLipids, accentGold),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 28),
+                      // 📐 ÉTAPE 7 : Resserrement des sections (de 28 à 16)
+                      const SizedBox(height: 16),
 
                       // --- SUIVI CORPOREL ---
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Poids de corps', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textMain, letterSpacing: 0.2)),
+                          Text('Poids de corps', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textMain, letterSpacing: 0.2, fontFamily: 'Inter')),
                           IconButton(
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                             onPressed: () => _logMorningWeight(_currentWeight, _targetWeight), 
-                            icon: Icon(Icons.add_circle_outline_rounded, color: accentCyan, size: 22)
+                            icon: Icon(Icons.add_circle_outline_rounded, color: accentGold, size: 22)
                           ),
                         ],
                       ),
@@ -353,16 +387,16 @@ class _DashboardTabState extends State<DashboardTab> {
                                   crossAxisAlignment: CrossAxisAlignment.baseline,
                                   textBaseline: TextBaseline.alphabetic,
                                   children: [
-                                    Text(_currentWeight.toStringAsFixed(1), style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: textMain, letterSpacing: -0.5)), 
+                                    Text(_currentWeight.toStringAsFixed(1), style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: textMain, letterSpacing: -0.5, fontFamily: 'Inter')), 
                                     const SizedBox(width: 4),
-                                    Text('kg', style: TextStyle(color: textMuted, fontSize: 14, fontWeight: FontWeight.bold)),
+                                    Text('kg', style: TextStyle(color: textMuted, fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                                   ],
                                 ),
                                 if (_targetWeight > 0) 
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8)),
-                                    child: Text('Cible : ${_targetWeight.toStringAsFixed(1)} kg', style: TextStyle(color: accentCyan, fontSize: 11, fontWeight: FontWeight.bold)),
+                                    child: Text('Cible : ${_targetWeight.toStringAsFixed(1)} kg', style: TextStyle(color: accentGold, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                                   )
                               ],
                             ),
@@ -386,7 +420,9 @@ class _DashboardTabState extends State<DashboardTab> {
     );
   }
 
-  // Ronds sobres avec couleurs signatures d'origines conservées
+// ... (Ta méthode _buildCircularMacro reste inchangée tout en bas)
+
+  // Ronds épurés unifiés avec ta nuance Or Premium
   Widget _buildCircularMacro(String label, int consumed, int target, Color color) {
     double progress = target > 0 ? (consumed / target).clamp(0.0, 1.0) : 0.0;
     return Column(
@@ -394,13 +430,13 @@ class _DashboardTabState extends State<DashboardTab> {
         Stack(
           alignment: Alignment.center, 
           children: [
-            // Fond circulaire ultra-discret
+            // Fond en or transparent très subtil
             SizedBox(
               width: 60, 
               height: 60, 
-              child: CircularProgressIndicator(value: 1.0, strokeWidth: 2.5, color: bgColor.withOpacity(0.4))
+              child: CircularProgressIndicator(value: 1.0, strokeWidth: 2.5, color: color.withValues(alpha:0.08))
             ),
-            // Arc de progression dynamique coloré
+            // Arc de progression fin en Or opaque
             SizedBox(
               width: 60, 
               height: 60, 
@@ -410,11 +446,11 @@ class _DashboardTabState extends State<DashboardTab> {
                 color: color,
               )
             ),
-            Text('$consumed', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: textMain)),
+            Text('$consumed', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: textMain, fontFamily: 'Inter')),
           ]
         ),
         const SizedBox(height: 10),
-        Text(label, style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.2)),
+        Text(label, style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.2, fontFamily: 'Inter')),
       ],
     );
   }

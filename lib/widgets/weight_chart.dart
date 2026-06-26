@@ -106,7 +106,7 @@ class WeightChart extends StatelessWidget {
             belowBarData: BarAreaData(
               show: true,
               gradient: LinearGradient(
-                colors: [Colors.orangeAccent.withOpacity(0.3), Colors.orangeAccent.withOpacity(0.0)],
+                colors: [Colors.orangeAccent.withValues(alpha:0.3), Colors.orangeAccent.withValues(alpha:0.0)],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),

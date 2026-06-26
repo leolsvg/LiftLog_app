@@ -11,12 +11,12 @@ class ConsistencyTracker extends StatefulWidget {
 class _ConsistencyTrackerState extends State<ConsistencyTracker> {
   List<String> _completedDates = [];
 
-  // --- Couleurs de ton thème LiftLog ---
-  final Color cardColor = const Color(0xFF1F252D);
+  // --- Palette de couleurs GAIN (Or & Anthracite unifié) ---
+  final Color cardColor = const Color(0xFF242424);
   final Color textMain = Colors.white;
   final Color textMuted = const Color(0xFFA0AAB5);
-  final Color colorDone = Colors.greenAccent.shade400; 
-  final Color colorEmpty = const Color(0xFF2A323C); 
+  final Color colorDone = const Color(0xFFC7AA0C); 
+  final Color colorEmpty = const Color(0xFF1E1E1E); 
 
   @override
   void initState() {
@@ -31,19 +31,19 @@ class _ConsistencyTrackerState extends State<ConsistencyTracker> {
     });
   }
 
-  // 🧹 FONCTION SECRÈTE DE DÉBOGAGE : TOUT EFFACER
+  // 🧹 REINITIALISATION DU TRACKER (Déclenchable par clic long sur la flamme)
   Future<void> _resetTracker() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('completed_workouts'); // Supprime la clé de la mémoire
+    await prefs.remove('completed_workouts'); 
     setState(() {
-      _completedDates = []; // Vide l'affichage instantanément
+      _completedDates = []; 
     });
     
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text("Calendrier réinitialisé 🧹", style: TextStyle(color: Colors.white)),
-          backgroundColor: Colors.grey.shade800,
+          content: const Text("Calendrier réinitialisé 🧹", style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold)),
+          backgroundColor: cardColor,
           duration: const Duration(seconds: 2),
         )
       );
@@ -57,13 +57,10 @@ class _ConsistencyTrackerState extends State<ConsistencyTracker> {
     final List<String> weekDays = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))
-        ],
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,15 +68,14 @@ class _ConsistencyTrackerState extends State<ConsistencyTracker> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("Régularité (7 derniers jours)", style: TextStyle(color: textMain, fontSize: 16, fontWeight: FontWeight.bold)),
+              Text("Régularité (7 derniers jours)", style: TextStyle(color: textMain, fontSize: 15, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
               
-              // 🔥 L'icône est maintenant cliquable pour effacer les données
               InkWell(
-                onLongPress: _resetTracker, // Un clic long déclenche le reset
+                onLongPress: _resetTracker, 
                 borderRadius: BorderRadius.circular(20),
                 child: Padding(
                   padding: const EdgeInsets.all(4.0),
-                  child: Icon(Icons.local_fire_department, color: colorDone),
+                  child: Icon(Icons.local_fire_department_rounded, color: colorDone, size: 20),
                 ),
               ),
             ],
@@ -96,22 +92,21 @@ class _ConsistencyTrackerState extends State<ConsistencyTracker> {
                 children: [
                   Text(
                     weekDays[date.weekday - 1], 
-                    style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.w600)
+                    style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.w600, fontFamily: 'Inter')
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    width: 35,
-                    height: 35,
+                    duration: const Duration(milliseconds: 200),
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
-                      color: isDone ? colorDone.withOpacity(0.2) : colorEmpty,
+                      color: isDone ? colorDone.withValues(alpha:0.08) : colorEmpty,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: isDone ? colorDone : Colors.transparent,
-                        width: 2,
+                        color: isDone ? colorDone : Colors.grey.shade900,
+                        width: isDone ? 1.5 : 1.0,
                       ),
                     ),
-                    child: isDone ? Icon(Icons.check, size: 20, color: colorDone) : null,
                   ),
                 ],
               );

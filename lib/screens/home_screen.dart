@@ -1,4 +1,3 @@
-import 'dart:convert'; 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/workout_model.dart';
@@ -15,14 +14,18 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final Color bgColor = const Color(0xFF13171C);
-  final Color accentCyan = const Color(0xFF38B6FF);
+  // --- Palette de couleurs GAIN (Or & Anthracite) ---
+  final Color bgColor = const Color(0xFF191919);
+  final Color cardColor = const Color(0xFF242424);
+  final Color accentGold = const Color(0xFFC7AA0C);
+  final Color textMain = Colors.white;
+  final Color textMuted = const Color(0xFFA0AAB5);
 
   List<WorkoutSession> _allSessions = [];
   bool _isLoading = true;
 
-  int _selectedSessionIndex = 0;
-  int _currentTabRowIndex = 1; // Par défaut sur l'Accueil
+  final int _selectedSessionIndex = 0;
+  int _currentTabRowIndex = 1; // Par défaut sur le Dashboard (Accueil)
 
   @override
   void initState() {
@@ -91,19 +94,20 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1F252D),
-        title: const Text('Supprimer ?', style: TextStyle(color: Colors.white)),
-        content: Text('Supprimer "${_allSessions[index].name}" ?', style: const TextStyle(color: Colors.white70)),
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Supprimer la séance ?', style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Inter')),
+        content: Text('Supprimer définitivement "${_allSessions[index].name}" ?', style: TextStyle(color: textMuted, fontSize: 14, fontFamily: 'Inter')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler', style: TextStyle(color: Colors.grey))),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Annuler', style: TextStyle(color: textMuted, fontFamily: 'Inter'))),
           ElevatedButton(
             onPressed: () async {
               setState(() => _allSessions.removeAt(index));
               Navigator.pop(context);
               await _syncSessionsToSupabase();
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red[800]),
-            child: const Text('Supprimer'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red[900], elevation: 0),
+            child: const Text('Supprimer', style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold)),
           )
         ],
       ),
@@ -115,15 +119,21 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1F252D),
-        title: const Text('Créer une séance', style: TextStyle(color: Colors.white)),
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Créer une séance', style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Inter')),
         content: TextField(
           controller: titleController, 
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(labelText: "Nom", labelStyle: TextStyle(color: Colors.grey)),
+          style: TextStyle(color: textMain, fontFamily: 'Inter'),
+          decoration: InputDecoration(
+            labelText: "Nom de l'entraînement", 
+            labelStyle: TextStyle(color: textMuted),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler', style: TextStyle(color: Colors.grey))),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Annuler', style: TextStyle(color: textMuted, fontFamily: 'Inter'))),
           ElevatedButton(
             onPressed: () async {
               if (titleController.text.isNotEmpty) {
@@ -132,8 +142,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 await _syncSessionsToSupabase();
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor),
-            child: const Text('Créer', style: TextStyle(fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: bgColor, elevation: 0),
+            child: const Text('Créer', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Inter')),
           )
         ],
       ),
@@ -142,7 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return Scaffold(backgroundColor: bgColor, body: const Center(child: CircularProgressIndicator(color: Color(0xFF38B6FF))));
+    if (_isLoading) return Scaffold(backgroundColor: bgColor, body: Center(child: CircularProgressIndicator(color: accentGold, strokeWidth: 2)));
 
     final List<Widget> tabs = [
       SessionsTab(
@@ -160,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
            }
         },
       ),
-      const EvolutionTab(), // Regroupe Calories, Mensurations et Photos
+      const EvolutionTab(), 
     ];
 
     return Scaffold(
@@ -169,14 +179,16 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentTabRowIndex,
         onTap: (index) => setState(() => _currentTabRowIndex = index),
-        backgroundColor: const Color(0xFF1F252D),
-        selectedItemColor: accentCyan,
-        unselectedItemColor: Colors.grey,
+        backgroundColor: cardColor,
+        selectedItemColor: accentGold,
+        unselectedItemColor: textMuted.withValues(alpha:0.6),
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, fontFamily: 'Inter'),
+        unselectedLabelStyle: const TextStyle(fontSize: 11, fontFamily: 'Inter'),
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.fitness_center), label: 'Séances'),
-          BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: 'Accueil'),
-          BottomNavigationBarItem(icon: Icon(Icons.analytics_outlined), label: 'Suivi'),
+          BottomNavigationBarItem(icon: Icon(Icons.fitness_center_rounded, size: 22), label: 'Séances'),
+          BottomNavigationBarItem(icon: Icon(Icons.home_filled, size: 22), label: 'Accueil'),
+          BottomNavigationBarItem(icon: Icon(Icons.analytics_outlined, size: 22), label: 'Suivi'),
         ],
       ),
     );

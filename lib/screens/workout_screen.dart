@@ -30,10 +30,10 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
   AnimationController? _progressController;
   late DateTime _startTime;
 
-  // Signatures de style
-  final Color bgColor = const Color(0xFF13171C);
-  final Color cardColor = const Color(0xFF1F252D);
-  final Color accentCyan = const Color(0xFF38B6FF);
+  // Signatures de style GAIN - Or & Anthracite unifié
+  final Color bgColor = const Color(0xFF191919);
+  final Color cardColor = const Color(0xFF242424);
+  final Color accentGold = const Color(0xFFC7AA0C);
   final Color textMain = Colors.white;
   final Color textMuted = const Color(0xFFA0AAB5);
 
@@ -162,8 +162,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
         _stopRestTimer();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text("Chrono terminé. À la suite 🦾", style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Inter', fontSize: 13)),
-            backgroundColor: accentCyan,
+            content: const Text("Chrono terminé. À la suite 🦾", style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Inter', fontSize: 13, color: Colors.white)),
+            backgroundColor: accentGold,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -248,7 +248,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Center(child: CircularProgressIndicator(color: accentCyan, strokeWidth: 2)),
+      builder: (context) => Center(child: CircularProgressIndicator(color: accentGold, strokeWidth: 2)),
     );
 
     try {
@@ -269,9 +269,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text("Séance validée et enregistrée ! 💪", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
-            backgroundColor: const Color(0xFF1E2922),
+            backgroundColor: const Color(0xFF1E211A),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.green, width: 0.5)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: accentGold, width: 0.5)),
           )
         );
         Navigator.pop(context); 
@@ -318,9 +318,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                           child: ChoiceChip(
                             label: const Text('Musculation'),
                             selected: !isCardioSelected,
-                            selectedColor: accentCyan.withOpacity(0.15),
+                            selectedColor: accentGold.withValues(alpha:0.15),
                             backgroundColor: bgColor,
-                            labelStyle: TextStyle(color: !isCardioSelected ? accentCyan : textMuted, fontWeight: FontWeight.bold, fontSize: 13),
+                            labelStyle: TextStyle(color: !isCardioSelected ? accentGold : textMuted, fontWeight: FontWeight.bold, fontSize: 13),
                             onSelected: (val) => setDialogState(() => isCardioSelected = false),
                           ),
                         ),
@@ -329,9 +329,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                           child: ChoiceChip(
                             label: const Text('Cardio'),
                             selected: isCardioSelected,
-                            selectedColor: accentCyan.withOpacity(0.15),
+                            selectedColor: accentGold.withValues(alpha:0.15),
                             backgroundColor: bgColor,
-                            labelStyle: TextStyle(color: isCardioSelected ? accentCyan : textMuted, fontWeight: FontWeight.bold, fontSize: 13),
+                            labelStyle: TextStyle(color: isCardioSelected ? accentGold : textMuted, fontWeight: FontWeight.bold, fontSize: 13),
                             onSelected: (val) => setDialogState(() => isCardioSelected = true),
                           ),
                         ),
@@ -359,7 +359,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                             labelText: "Exercice principal", 
                             labelStyle: TextStyle(color: textMuted),
                             enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
-                            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentCyan)),
+                            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
                           ),
                         );
                       },
@@ -406,7 +406,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                           labelText: "Exercice secondaire (Optionnel)", 
                           labelStyle: TextStyle(color: textMuted),
                           enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
-                          focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentCyan)),
+                          focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
                         ),
                       ),
                     ] else ...[
@@ -419,7 +419,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
               actions: [
                 TextButton(onPressed: () => Navigator.pop(context), child: Text('Annuler', style: TextStyle(color: textMuted))),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor, elevation: 0),
+                  style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: bgColor, elevation: 0),
                   onPressed: () {
                     if (nameController.text.isNotEmpty) {
                       List<String> alts = alternativeController.text.trim().isNotEmpty 
@@ -511,7 +511,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
-                      side: BorderSide(color: allDone ? accentCyan.withOpacity(0.4) : Colors.transparent, width: 1.0),
+                      side: BorderSide(color: allDone ? accentGold.withValues(alpha:0.4) : Colors.transparent, width: 1.0),
                     ),
                     child: Column(
                       children: [
@@ -541,7 +541,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                                             fontSize: 16, 
                                             fontWeight: FontWeight.bold, 
                                             fontFamily: 'Inter',
-                                            color: allDone ? accentCyan : textMain,
+                                            color: allDone ? accentGold : textMain,
                                             decoration: allDone ? TextDecoration.lineThrough : null,
                                           ),
                                         ),
@@ -561,7 +561,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
-                                                  Icon(Icons.swap_horiz, size: 13, color: accentCyan),
+                                                  Icon(Icons.swap_horiz, size: 13, color: accentGold),
                                                   const SizedBox(width: 4),
                                                   Text(
                                                     "Remplacer : ${exercise.alternatives.first}",
@@ -582,7 +582,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                                       fontWeight: FontWeight.w900, 
                                       fontSize: 12,
                                       fontFamily: 'Inter',
-                                      color: allDone ? accentCyan : Colors.orangeAccent.shade200
+                                      color: allDone ? accentGold : Colors.orangeAccent.shade200
                                     ),
                                   ),
                                 const SizedBox(width: 10),
@@ -659,7 +659,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                                                   decoration: InputDecoration(
                                                     border: InputBorder.none,
                                                     enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade900)),
-                                                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentCyan)),
+                                                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
                                                   ),
                                                   onChanged: (val) {
                                                     if (exercise.isCardio) {
@@ -684,7 +684,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                                                   decoration: InputDecoration(
                                                     border: InputBorder.none,
                                                     enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade900)),
-                                                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentCyan)),
+                                                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
                                                   ),
                                                   onChanged: (val) {
                                                     if (exercise.isCardio) {
@@ -705,7 +705,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                                                   constraints: const BoxConstraints(),
                                                   icon: Icon(
                                                     isSetDone ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
-                                                    color: isSetDone ? accentCyan : textMuted.withOpacity(0.5),
+                                                    color: isSetDone ? accentGold : textMuted.withValues(alpha:0.5),
                                                     size: 24,
                                                   ),
                                                   onPressed: () {
@@ -772,13 +772,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
               builder: (context, child) {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  color: const Color(0xFF161A20), // Noir velours
+                  color: const Color(0xFF161A20), 
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.hourglass_empty_rounded, color: accentCyan, size: 16),
+                          Icon(Icons.hourglass_empty_rounded, color: accentGold, size: 16),
                           const SizedBox(width: 8),
                           Text(
                             _formatTime(_currentRestSeconds),
@@ -792,7 +792,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                           const SizedBox(width: 12),
                           InkWell(
                             onTap: () => _adjustRestTime(30),
-                            child: Text("+30s", style: TextStyle(color: accentCyan, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
+                            child: Text("+30s", style: TextStyle(color: accentGold, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                           ),
                           const Spacer(),
                           IconButton(
@@ -809,8 +809,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                         child: LinearProgressIndicator(
                           value: 1.0 - _progressController!.value,
                           backgroundColor: bgColor,
-                          valueColor: AlwaysStoppedAnimation<Color>(accentCyan),
-                          minHeight: 2, // Ligne fine
+                          valueColor: AlwaysStoppedAnimation<Color>(accentGold),
+                          minHeight: 2, 
                         ),
                       ),
                     ],
@@ -829,7 +829,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                   onPressed: _showAddExerciseDialog,
                   icon: Icon(Icons.add_rounded, size: 18, color: bgColor),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: accentCyan,
+                    backgroundColor: accentGold,
                     elevation: 0,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
@@ -847,8 +847,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                 child: OutlinedButton(
                   onPressed: _finishWorkout,
                   style: OutlinedButton.styleFrom(
-                    backgroundColor: const Color(0xFF16221B), // Fond vert forêt ultra sombre
-                    side: BorderSide(color: Colors.green.shade700, width: 0.8),
+                    backgroundColor: const Color(0xFF1E211A), // Fond velours sombre
+                    side: BorderSide(color: accentGold.withValues(alpha:0.5), width: 0.8),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   child: const Text('TERMINER LA SÉANCE', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1.0, fontFamily: 'Inter')),

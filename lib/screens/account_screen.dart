@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // 👈 Indispensable pour copier le modèle dans le presse-papiers
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart'; 
-import 'package:file_picker/file_picker.dart'; 
+import 'package:url_launcher/url_launcher.dart';
+
 import 'login_screen.dart';
 
 class AccountScreen extends StatefulWidget {
@@ -15,10 +17,10 @@ class AccountScreen extends StatefulWidget {
 }
 
 class _AccountScreenState extends State<AccountScreen> {
-  // --- Palette de couleurs LiftLog ---
-  final Color bgColor = const Color(0xFF13171C);
-  final Color cardColor = const Color(0xFF1F252D);
-  final Color accentCyan = const Color(0xFF38B6FF);
+  // --- Palette de couleurs GAIN (Or & Anthracite unifié) ---
+  final Color bgColor = const Color(0xFF191919);
+  final Color cardColor = const Color(0xFF242424);
+  final Color accentGold = const Color(0xFFC7AA0C);
   final Color textMain = Colors.white;
   final Color textMuted = const Color(0xFFA0AAB5);
 
@@ -64,7 +66,7 @@ class _AccountScreenState extends State<AccountScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Impossible d'ouvrir la page : $e"),
+            content: Text("Impossible d'ouvrir la page : $e", style: const TextStyle(fontFamily: 'Inter')),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -108,15 +110,15 @@ class _AccountScreenState extends State<AccountScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text("Objectifs mis à jour ! 🦾", style: TextStyle(fontWeight: FontWeight.bold)),
-            backgroundColor: accentCyan.withOpacity(0.8),
+            content: const Text("Objectifs mis à jour ! 🦾", style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Inter')),
+            backgroundColor: accentGold,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Erreur lors de la sauvegarde"), backgroundColor: Colors.redAccent),
+          const SnackBar(content: Text("Erreur lors de la sauvegarde", style: TextStyle(fontFamily: 'Inter')), backgroundColor: Colors.redAccent),
         );
       }
     } finally {
@@ -124,7 +126,6 @@ class _AccountScreenState extends State<AccountScreen> {
     }
   }
 
-  // 📥 PARSER & ENVOI MASSIF DE L'HISTORIQUE DE MUSCULATION
   Future<void> _importWorkoutHistory() async {
     if (_user == null) return;
 
@@ -157,7 +158,7 @@ class _AccountScreenState extends State<AccountScreen> {
           await _supabase.from('workout_exercises').insert({
             'workout_id': workoutId,
             'exercise_name': set['exercise_name'],
-            'set_number': set['set_index'],
+            'set_number': set['set_number'] ?? set['set_index'],
             'weight': (set['weight'] as num).toDouble(),
             'reps': set['reps'] as int,
           });
@@ -166,13 +167,13 @@ class _AccountScreenState extends State<AccountScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Historique d'entraînement synchronisé ! 🔥"), backgroundColor: Colors.green),
+          const SnackBar(content: Text("Historique d'entraînement synchronisé ! 🔥", style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold)), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erreur lors du traitement : $e"), backgroundColor: Colors.redAccent),
+          SnackBar(content: Text("Erreur lors du traitement : $e", style: const TextStyle(fontFamily: 'Inter')), backgroundColor: Colors.redAccent),
         );
       }
     } finally {
@@ -180,7 +181,6 @@ class _AccountScreenState extends State<AccountScreen> {
     }
   }
 
-  // ℹ️ PANNEAU EXPLICATIF : COMMENT STRUCTURER LE JSON
   void _showImportInstructions() {
     const String templateJson = '[\n  {\n    "workout_name": "Push Day",\n    "date": "2026-06-11T18:30:00Z",\n    "duration": 60,\n    "sets": [\n      {\n        "exercise_name": "Développé Couché",\n        "set_index": 1,\n        "weight": 80.0,\n        "reps": 10\n      }\n    ]\n  }\n]';
 
@@ -188,7 +188,7 @@ class _AccountScreenState extends State<AccountScreen> {
       context: context,
       backgroundColor: cardColor,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
         return DraggableScrollableSheet(
           initialChildSize: 0.7,
@@ -202,9 +202,9 @@ class _AccountScreenState extends State<AccountScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade700, borderRadius: BorderRadius.circular(10)))),
+                  Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade800, borderRadius: BorderRadius.circular(10)))),
                   const SizedBox(height: 20),
-                  Text("Guide de Migration 🚀", style: TextStyle(color: textMain, fontSize: 22, fontWeight: FontWeight.bold)),
+                  Text("Guide de Migration 🚀", style: TextStyle(color: textMain, fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                   const SizedBox(height: 16),
                   _buildStepRow("1", "Crée un fichier texte vide sur ton PC/téléphone et renomme-le en extension .json (ex: historique.json)."),
                   _buildStepRow("2", "Colle l'historique de tes entraînements en respectant exactement le format requis (modèle ci-dessous)."),
@@ -213,13 +213,13 @@ class _AccountScreenState extends State<AccountScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text("STRUCTURE DU FICHIER (.JSON)", style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold)),
+                      Text("STRUCTURE DU FICHIER (.JSON)", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                       TextButton.icon(
-                        icon: Icon(Icons.copy, size: 14, color: accentCyan),
-                        label: Text("Copier le modèle", style: TextStyle(color: accentCyan, fontSize: 13, fontWeight: FontWeight.bold)),
+                        icon: Icon(Icons.copy_rounded, size: 14, color: accentGold),
+                        label: Text("Copier le modèle", style: TextStyle(color: accentGold, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                         onPressed: () {
                           Clipboard.setData(const ClipboardData(text: templateJson));
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Modèle copié dans le presse-papiers ! 📋"), backgroundColor: Colors.grey));
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text("Modèle copié ! 📋", style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold)), backgroundColor: cardColor));
                         },
                       )
                     ],
@@ -228,7 +228,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white10)),
+                    decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade900)),
                     child: const Text(
                       templateJson,
                       style: TextStyle(color: Colors.greenAccent, fontFamily: 'monospace', fontSize: 12, height: 1.4),
@@ -249,9 +249,9 @@ class _AccountScreenState extends State<AccountScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(radius: 11, backgroundColor: accentCyan.withOpacity(0.15), child: Text(number, style: TextStyle(color: accentCyan, fontSize: 11, fontWeight: FontWeight.bold))),
+          CircleAvatar(radius: 11, backgroundColor: accentGold.withValues(alpha: 0.08), child: Text(number, style: TextStyle(color: accentGold, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter'))),
           const SizedBox(width: 12),
-          Expanded(child: Text(text, style: TextStyle(color: textMuted, fontSize: 14, height: 1.3))),
+          Expanded(child: Text(text, style: TextStyle(color: textMuted, fontSize: 13, height: 1.4, fontFamily: 'Inter'))),
         ],
       ),
     );
@@ -264,20 +264,22 @@ class _AccountScreenState extends State<AccountScreen> {
     setState(() => _isLoading = true);
     try {
       await _supabase.auth.updateUser(UserAttributes(email: newEmail));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Un mail de confirmation a été envoyé à ta nouvelle adresse ! ✉️"),
-            backgroundColor: Colors.green,
-          ),
-        );
-        setState(() => _showEmailFields = false);
-      }
-    } on AuthException catch (e) {
+      
+      if (!mounted) return; // 🦾 Sécurise le BuildContext après le await
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
+        SnackBar(
+          content: const Text("Un mail de confirmation a été envoyé ! ✉️", style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold)),
+          backgroundColor: cardColor,
+        ),
       );
-    } finally {
+      setState(() => _showEmailFields = false);
+    } on AuthException catch (e) {
+      if (!mounted) return; // 🦾 Sécurise le BuildContext ici aussi
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message, style: const TextStyle(fontFamily: 'Inter')), backgroundColor: Colors.redAccent),
+      );
+    } finally { // 🦾 Corrigé : c'était écrit "final" au lieu de "finally", ce qui cassait la compilation !
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -290,7 +292,7 @@ class _AccountScreenState extends State<AccountScreen> {
 
     if (password != confirmPassword) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Les mots de passe ne correspondent pas"), backgroundColor: Colors.redAccent),
+        const SnackBar(content: Text("Les mots de passe ne correspondent pas", style: TextStyle(fontFamily: 'Inter')), backgroundColor: Colors.redAccent),
       );
       return;
     }
@@ -300,15 +302,16 @@ class _AccountScreenState extends State<AccountScreen> {
       await _supabase.auth.updateUser(UserAttributes(password: password));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Mot de passe mis à jour avec succès ! 🔐"), backgroundColor: Colors.green),
+          const SnackBar(content: Text("Mot de passe mis à jour ! 🔐", style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold)), backgroundColor: Colors.green),
         );
         _passwordController.clear();
         _confirmPasswordController.clear();
         setState(() => _showPasswordFields = false);
       }
     } on AuthException catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
+        SnackBar(content: Text(e.message, style: const TextStyle(fontFamily: 'Inter')), backgroundColor: Colors.redAccent),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -320,27 +323,34 @@ class _AccountScreenState extends State<AccountScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: cardColor,
-        title: Text("Déconnexion", style: TextStyle(color: textMain, fontWeight: FontWeight.bold)),
-        content: Text("Es-tu sûr de vouloir quitter LiftLog ?", style: TextStyle(color: textMuted)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text("Déconnexion", style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Inter')),
+        content: Text("Es-tu sûr de vouloir quitter GAIN ?", style: TextStyle(color: textMuted, fontSize: 14, fontFamily: 'Inter')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text("Annuler", style: TextStyle(color: textMuted)),
+            child: Text("Annuler", style: TextStyle(color: textMuted, fontFamily: 'Inter')),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red[900], 
+              foregroundColor: Colors.white, 
+              elevation: 0,
+            ),
             onPressed: () async {
-              Navigator.pop(context);
-              await _supabase.auth.signOut();
-              if (mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false,
-                );
-              }
-            },
-            child: const Text("Quitter", style: TextStyle(fontWeight: FontWeight.bold)),
+  Navigator.pop(context);
+  await _supabase.auth.signOut();
+  
+  // 🦾 Sécurité absolue basée sur le BuildContext lui-même
+  if (!context.mounted) return; 
+
+  Navigator.pushAndRemoveUntil(
+    context,
+    MaterialPageRoute(builder: (context) => const LoginScreen()),
+    (route) => false,
+  );
+},
+            child: const Text("Quitter", style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Inter')),
           ),
         ],
       ),
@@ -352,42 +362,43 @@ class _AccountScreenState extends State<AccountScreen> {
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
-        title: Text("Paramètres", style: TextStyle(color: textMain, fontWeight: FontWeight.bold)),
+        title: Text("PARAMÈTRES", style: TextStyle(color: textMain, fontFamily: 'TheSeason', fontSize: 16, letterSpacing: 0.5)),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: true,
         iconTheme: IconThemeData(color: textMain),
       ),
       body: _isLoading 
-          ? Center(child: CircularProgressIndicator(color: accentCyan))
+          ? Center(child: CircularProgressIndicator(color: accentGold, strokeWidth: 2))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // --- SECTION 1 : PROFIL ---
-                  Text("MON COMPTE", style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  Text("MON COMPTE", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8, fontFamily: 'Inter')),
                   const SizedBox(height: 8),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
+                    decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(14)),
                     child: Row(
                       children: [
                         CircleAvatar(
-                          backgroundColor: accentCyan.withOpacity(0.1),
-                          radius: 26,
-                          child: Icon(Icons.person, color: accentCyan, size: 28),
+                          backgroundColor: bgColor,
+                          radius: 24,
+                          child: Icon(Icons.person_rounded, color: accentGold, size: 22),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text("Utilisateur connecté", style: TextStyle(color: textMuted, fontSize: 12)),
+                              Text("Utilisateur connecté", style: TextStyle(color: textMuted, fontSize: 11, fontFamily: 'Inter')),
                               const SizedBox(height: 2),
                               Text(
                                 _user?.email ?? "Non connecté",
-                                style: TextStyle(color: textMain, fontSize: 16, fontWeight: FontWeight.bold),
+                                style: TextStyle(color: textMain, fontSize: 15, fontWeight: FontWeight.bold, fontFamily: 'Inter'),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ],
@@ -399,17 +410,17 @@ class _AccountScreenState extends State<AccountScreen> {
                   const SizedBox(height: 24),
 
                   // --- SECTION 2 : SÉCURITÉ (EMAIL & MDP) ---
-                  Text("SÉCURITÉ DU COMPTE", style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  Text("SÉCURITÉ DU COMPTE", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8, fontFamily: 'Inter')),
                   const SizedBox(height: 8),
                   Container(
                     width: double.infinity,
-                    decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
+                    decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(14)),
                     child: Column(
                       children: [
                         ListTile(
-                          leading: Icon(Icons.email_outlined, color: accentCyan),
-                          title: Text("Modifier l'adresse email", style: TextStyle(color: textMain, fontSize: 15, fontWeight: FontWeight.w600)),
-                          trailing: Icon(_showEmailFields ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: textMuted),
+                          leading: Icon(Icons.email_outlined, color: accentGold, size: 20),
+                          title: Text("Modifier l'adresse email", style: TextStyle(color: textMain, fontSize: 14, fontWeight: FontWeight.w600, fontFamily: 'Inter')),
+                          trailing: Icon(_showEmailFields ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: textMuted, size: 18),
                           onTap: () => setState(() => _showEmailFields = !_showEmailFields),
                         ),
                         if (_showEmailFields)
@@ -418,26 +429,23 @@ class _AccountScreenState extends State<AccountScreen> {
                             child: Row(
                               children: [
                                 Expanded(
-                                  child: SizedBox(
-                                    height: 45,
+                                  child: Container(
+                                    height: 40,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10)),
                                     child: TextField(
                                       controller: _emailController,
                                       keyboardType: TextInputType.emailAddress,
-                                      style: TextStyle(color: textMain, fontSize: 14),
-                                      decoration: InputDecoration(
-                                        filled: true,
-                                        fillColor: bgColor,
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                                      ),
+                                      style: TextStyle(color: textMain, fontSize: 14, fontFamily: 'Inter'),
+                                      decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.zero),
                                     ),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
                                 ElevatedButton(
                                   onPressed: _updateEmail,
-                                  style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                                  child: const Text("Mettre à jour", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                  style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: bgColor, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), padding: const EdgeInsets.symmetric(horizontal: 16)),
+                                  child: const Text("Mettre à jour", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, fontFamily: 'Inter')),
                                 )
                               ],
                             ),
@@ -446,9 +454,9 @@ class _AccountScreenState extends State<AccountScreen> {
                         Divider(height: 1, color: bgColor),
 
                         ListTile(
-                          leading: Icon(Icons.lock_outline, color: accentCyan),
-                          title: Text("Modifier le mot de passe", style: TextStyle(color: textMain, fontSize: 15, fontWeight: FontWeight.w600)),
-                          trailing: Icon(_showPasswordFields ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: textMuted),
+                          leading: Icon(Icons.lock_outline_rounded, color: accentGold, size: 20),
+                          title: Text("Modifier le mot de passe", style: TextStyle(color: textMain, fontSize: 14, fontWeight: FontWeight.w600, fontFamily: 'Inter')),
+                          trailing: Icon(_showPasswordFields ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: textMuted, size: 18),
                           onTap: () => setState(() => _showPasswordFields = !_showPasswordFields),
                         ),
                         if (_showPasswordFields)
@@ -459,36 +467,34 @@ class _AccountScreenState extends State<AccountScreen> {
                                 TextField(
                                   controller: _passwordController,
                                   obscureText: true,
-                                  style: TextStyle(color: textMain),
+                                  style: TextStyle(color: textMain, fontFamily: 'Inter'),
                                   decoration: InputDecoration(
                                     labelText: "Nouveau mot de passe",
-                                    labelStyle: TextStyle(color: textMuted, fontSize: 13),
-                                    filled: true,
-                                    fillColor: bgColor,
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                                    labelStyle: TextStyle(color: textMuted, fontSize: 12),
+                                    enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade900)),
+                                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
                                   ),
                                 ),
                                 const SizedBox(height: 12),
                                 TextField(
                                   controller: _confirmPasswordController,
                                   obscureText: true,
-                                  style: TextStyle(color: textMain),
+                                  style: TextStyle(color: textMain, fontFamily: 'Inter'),
                                   decoration: InputDecoration(
-                                    labelText: "Confirmer le nouveau mot de passe",
-                                    labelStyle: TextStyle(color: textMuted, fontSize: 13),
-                                    filled: true,
-                                    fillColor: bgColor,
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                                    labelText: "Confirmer le mot de passe",
+                                    labelStyle: TextStyle(color: textMuted, fontSize: 12),
+                                    enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade900)),
+                                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
                                   ),
                                 ),
                                 const SizedBox(height: 16),
                                 SizedBox(
                                   width: double.infinity,
-                                  height: 45,
+                                  height: 42,
                                   child: ElevatedButton(
                                     onPressed: _updatePassword,
-                                    style: ElevatedButton.styleFrom(backgroundColor: accentCyan, foregroundColor: bgColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                                    child: const Text("Changer le mot de passe", style: TextStyle(fontWeight: FontWeight.bold)),
+                                    style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: bgColor, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                                    child: const Text("Changer le mot de passe", style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Inter', fontSize: 13)),
                                   ),
                                 )
                               ],
@@ -500,54 +506,56 @@ class _AccountScreenState extends State<AccountScreen> {
                   const SizedBox(height: 24),
 
                   // --- SECTION 3 : OBJECTIFS PHYSIQUE ---
-                  Text("OBJECTIFS PHYSIQUE", style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  Text("OBJECTIFS PHYSIQUE", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8, fontFamily: 'Inter')),
                   const SizedBox(height: 8),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
+                    decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(14)),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text("Poids cible global", style: TextStyle(color: textMain, fontSize: 15, fontWeight: FontWeight.bold)),
+                        Text("Poids cible global", style: TextStyle(color: textMain, fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                         const SizedBox(height: 4),
                         Text(
                           "Modifie ton objectif de masse. Il s'affichera directement sur le graphique de ton accueil.",
-                          style: TextStyle(color: textMuted, fontSize: 12),
+                          style: TextStyle(color: textMuted, fontSize: 12, fontFamily: 'Inter'),
                         ),
                         const SizedBox(height: 16),
                         Row(
                           children: [
                             Expanded(
-                              child: SizedBox(
-                                height: 45,
+                              child: Container(
+                                height: 42,
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10)),
                                 child: TextField(
                                   controller: _targetWeightController,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                  style: TextStyle(color: textMain, fontWeight: FontWeight.bold),
+                                  style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontFamily: 'Inter'),
                                   decoration: InputDecoration(
                                     labelText: "Objectif (kg)",
-                                    labelStyle: TextStyle(color: textMuted, fontSize: 13),
-                                    filled: true,
-                                    fillColor: bgColor,
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    labelStyle: TextStyle(color: textMuted, fontSize: 11),
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.zero,
                                   ),
                                 ),
                               ),
                             ),
                             const SizedBox(width: 12),
                             SizedBox(
-                              height: 45,
+                              height: 42,
                               child: ElevatedButton.icon(
                                 onPressed: _saveProfile,
-                                icon: const Icon(Icons.save, size: 18),
+                                icon: Icon(Icons.save_rounded, size: 16, color: bgColor),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: accentCyan,
+                                  backgroundColor: accentGold,
                                   foregroundColor: bgColor,
+                                  elevation: 0,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
                                 ),
-                                label: const Text("Sauver", style: TextStyle(fontWeight: FontWeight.bold)),
+                                label: const Text("Sauver", style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Inter', fontSize: 13)),
                               ),
                             ),
                           ],
@@ -558,21 +566,20 @@ class _AccountScreenState extends State<AccountScreen> {
                   const SizedBox(height: 24),
 
                   // --- SECTION 4 : IMPORTATION DES DONNÉES ---
-                  Text("IMPORTATION DES DONNÉES", style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  Text("MIGRATION", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8, fontFamily: 'Inter')),
                   const SizedBox(height: 8),
                   Container(
                     width: double.infinity,
-                    decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
+                    decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(14)),
                     child: ListTile(
                       leading: _isImporting 
-                        ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: accentCyan, strokeWidth: 2))
-                        : Icon(Icons.file_upload_outlined, color: accentCyan),
-                      title: Text("Migrer d'une autre application", style: TextStyle(color: textMain, fontSize: 15, fontWeight: FontWeight.w600)),
-                      subtitle: Text("Importe tes séries et reps (Format JSON)", style: TextStyle(color: textMuted, fontSize: 12)),
-                      // 👈 AJOUT DE LA BULLE INFO D'AIDE SUR LE TRAILING
+                        ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: accentGold, strokeWidth: 1.5))
+                        : Icon(Icons.file_upload_outlined, color: accentGold, size: 20),
+                      title: Text("Migrer d'une autre application", style: TextStyle(color: textMain, fontSize: 14, fontWeight: FontWeight.w600, fontFamily: 'Inter')),
+                      subtitle: Text("Importe tes séries et reps (Format JSON)", style: TextStyle(color: textMuted, fontSize: 12, fontFamily: 'Inter')),
                       trailing: IconButton(
-                        icon: Icon(Icons.help_outline, color: accentCyan, size: 20),
-                        onPressed: _showImportInstructions, // Lance le guide de structure
+                        icon: Icon(Icons.help_outline_rounded, color: accentGold, size: 18),
+                        onPressed: _showImportInstructions, 
                       ),
                       onTap: _isImporting ? null : _importWorkoutHistory,
                     ),
@@ -580,24 +587,24 @@ class _AccountScreenState extends State<AccountScreen> {
                   const SizedBox(height: 24),
 
                   // --- SECTION 5 : LÉGAL & RGPD ---
-                  Text("LÉGAL", style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  Text("LÉGAL", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8, fontFamily: 'Inter')),
                   const SizedBox(height: 8),
                   Container(
                     width: double.infinity,
-                    decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
+                    decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(14)),
                     child: Column(
                       children: [
                         ListTile(
-                          leading: Icon(Icons.gavel_outlined, color: accentCyan, size: 20),
-                          title: Text("Mentions Légales", style: TextStyle(color: textMain, fontSize: 14)),
-                          trailing: Icon(Icons.open_in_new, color: textMuted, size: 16),
+                          leading: Icon(Icons.gavel_outlined, color: accentGold, size: 18),
+                          title: Text("Mentions Légales", style: TextStyle(color: textMain, fontSize: 13, fontFamily: 'Inter')),
+                          trailing: Icon(Icons.open_in_new_rounded, color: textMuted, size: 14),
                           onTap: () => _launchLegalUrl("https://liftlog-privacy.vercel.app"),
                         ),
                         Divider(height: 1, color: bgColor),
                         ListTile(
-                          leading: Icon(Icons.privacy_tip_outlined, color: accentCyan, size: 20),
-                          title: Text("Politique de Confidentialité", style: TextStyle(color: textMain, fontSize: 14)),
-                          trailing: Icon(Icons.open_in_new, color: textMuted, size: 16),
+                          leading: Icon(Icons.privacy_tip_outlined, color: accentGold, size: 20),
+                          title: Text("Politique de Confidentialité", style: TextStyle(color: textMain, fontSize: 14, fontFamily: 'Inter')),
+                          trailing: Icon(Icons.open_in_new, color: textMuted, size: 14),
                           onTap: () => _launchLegalUrl("https://liftlog-privacy.vercel.app"),
                         ),
                       ],
@@ -606,30 +613,30 @@ class _AccountScreenState extends State<AccountScreen> {
                   const SizedBox(height: 24),
 
                   // --- SECTION 6 : ACTIONS ---
-                  Text("ACTIONS", style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  Text("ACTIONS", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8, fontFamily: 'Inter')),
                   const SizedBox(height: 8),
                   InkWell(
                     onTap: _handleSignOut,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                     child: Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
                         color: cardColor, 
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.redAccent.withOpacity(0.2), width: 1)
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.15), width: 1)
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.logout_rounded, color: Colors.redAccent, size: 22),
+                              const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 20),
                               const SizedBox(width: 12),
-                              Text("Se déconnecter", style: TextStyle(color: Colors.redAccent, fontSize: 15, fontWeight: FontWeight.bold)),
+                              Text("Se déconnecter", style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                             ],
                           ),
-                          Icon(Icons.chevron_right, color: Colors.redAccent, size: 20),
+                          const Icon(Icons.chevron_right_rounded, color: Colors.redAccent, size: 18),
                         ],
                       ),
                     ),
@@ -640,15 +647,15 @@ class _AccountScreenState extends State<AccountScreen> {
                   Center(
                     child: Column(
                       children: [
-                        Text("LiftLog v1.0.0", style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold)),
+                        Text("GAIN v1.1.0", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                         const SizedBox(height: 4),
                         Text(
-                          "Conçu pour soulever lourd.", 
-                          style: TextStyle(color: textMuted.withOpacity(0.5), fontSize: 11, fontStyle: FontStyle.italic)
+                          "Conçu pour l'esthétique et la performance.", 
+                          style: TextStyle(color: textMuted.withValues(alpha: 0.4), fontSize: 11, fontFamily: 'Inter')
                         ),
                       ],
                     ),
-                  )
+                  ),
                 ],
               ),
             ),

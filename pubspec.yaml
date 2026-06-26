@@ -1,41 +1,43 @@
-name: liftlog
-description: Une app de muscu et nutrition.
+name: gain
+description: Une app de muscu et nutrition premium.
 publish_to: 'none'
 
-version: 1.0.1+7
-
+version: 1.2.1+8
 
 environment:
-  sdk: ^3.11.4
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
-    assets:
-      - assets/img/logo.png
-      - assets/img/min_logo.png
 
-  image_picker: ^1.1.2  # Pour prendre des photos avec l'appareil ou la galerie
-  
+  image_picker: ^1.1.2       # Pour prendre des photos avec l'appareil ou la galerie
   url_launcher: ^6.3.0
   cupertino_icons: ^1.0.8
   http: ^1.6.0
   percent_indicator: ^4.2.5
-  shared_preferences: ^2.2.2
+  shared_preferences: ^2.3.2
   mobile_scanner: ^7.2.0
   font_awesome_flutter: ^11.0.0
   supabase_flutter: ^2.8.0
-  fl_chart: ^0.69.0
-  intl: ^0.19.0
-  file_picker: ^8.0.0
-      
-
+  fl_chart: ^1.2.0           # Mis à jour pour SPM
+  intl: ^0.20.2              # Mis à jour pour SPM
+  file_picker: ^8.3.7        # Mis à jour pour forcer la compatibilité iOS 14+
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^2.0.0
+  flutter_lints: ^6.0.0
 
-# CETTE SECTION DOIT ÊTRE À LA RACINE (DÉCALÉE VERS LA GAUCHE)
 flutter:
   uses-material-design: true
+
+  # 🖼️ Section Assets correctement isolée et alignée sous la racine "flutter:"
+  assets:
+    - assets/img/logo.png
+    - assets/img/min_logo.png
+    - assets/img/logo_trans.png
+    - assets/img/min_logo_trans.png
+
+
+ 

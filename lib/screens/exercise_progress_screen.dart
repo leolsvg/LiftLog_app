@@ -27,10 +27,10 @@ class ExerciseProgressScreen extends StatefulWidget {
 }
 
 class _ExerciseProgressScreenState extends State<ExerciseProgressScreen> {
-  // --- Palette de couleurs LiftLog ---
-  final Color bgColor = const Color(0xFF13171C);
-  final Color cardColor = const Color(0xFF1F252D);
-  final Color accentCyan = const Color(0xFF38B6FF);
+  // --- Palette de couleurs GAIN (Or & Anthracite unifié) ---
+  final Color bgColor = const Color(0xFF191919);
+  final Color cardColor = const Color(0xFF242424);
+  final Color accentGold = const Color(0xFFC7AA0C);
   final Color textMain = Colors.white;
   final Color textMuted = const Color(0xFFA0AAB5);
 
@@ -91,15 +91,16 @@ class _ExerciseProgressScreenState extends State<ExerciseProgressScreen> {
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
-        title: const Text("Progression", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text("PROGRESSION", style: TextStyle(color: textMain, fontFamily: 'TheSeason', fontSize: 16, letterSpacing: 0.5)),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        centerTitle: true,
+        iconTheme: IconThemeData(color: textMain),
       ),
       body: _isLoading 
-          ? Center(child: CircularProgressIndicator(color: accentCyan))
+          ? Center(child: CircularProgressIndicator(color: accentGold, strokeWidth: 2))
           : _progressSpots.isEmpty 
-              ? Center(child: Text("Aucune donnée enregistrée pour cet exercice.", style: TextStyle(color: textMuted, fontSize: 15)))
+              ? Center(child: Text("Aucune donnée enregistrée pour cet exercice.", style: TextStyle(color: textMuted, fontSize: 14, fontFamily: 'Inter')))
               : Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -107,21 +108,22 @@ class _ExerciseProgressScreenState extends State<ExerciseProgressScreen> {
                     children: [
                       Text(
                         widget.exerciseName,
-                        style: TextStyle(color: textMain, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                        style: TextStyle(color: textMain, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.5, fontFamily: 'Inter'),
                       ),
+                      const SizedBox(height: 2),
                       Text(
-                        "Évolution de ton poids max (kg) au fil des séances",
-                        style: TextStyle(color: textMuted, fontSize: 14),
+                        "Évolution de ta charge maximale au fil des séances",
+                        style: TextStyle(color: textMuted, fontSize: 13, fontFamily: 'Inter'),
                       ),
                       const SizedBox(height: 32),
 
-                      // Zone du Graphique
+                      // Zone du Graphique Épurée
                       Container(
-                        height: 300,
-                        padding: const EdgeInsets.only(right: 24, left: 8, top: 24, bottom: 12),
+                        height: 280,
+                        padding: const EdgeInsets.only(right: 20, left: 4, top: 20, bottom: 8),
                         decoration: BoxDecoration(
                           color: cardColor,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(14),
                         ),
                         child: LineChart(
                           LineChartData(
@@ -129,7 +131,7 @@ class _ExerciseProgressScreenState extends State<ExerciseProgressScreen> {
                               show: true,
                               drawVerticalLine: false,
                               getDrawingHorizontalLine: (value) => FlLine(
-                                color: Colors.grey.shade800.withOpacity(0.5),
+                                color: Colors.grey.shade900,
                                 strokeWidth: 1,
                               ),
                             ),
@@ -140,14 +142,14 @@ class _ExerciseProgressScreenState extends State<ExerciseProgressScreen> {
                               bottomTitles: AxisTitles(
                                 sideTitles: SideTitles(
                                   showTitles: true,
-                                  reservedSize: 30,
+                                  reservedSize: 28,
                                   interval: 1,
                                   getTitlesWidget: (value, meta) {
                                     return Padding(
                                       padding: const EdgeInsets.only(top: 8.0),
                                       child: Text(
                                         "S${value.toInt()}",
-                                        style: TextStyle(color: textMuted, fontWeight: FontWeight.bold, fontSize: 12),
+                                        style: TextStyle(color: textMuted, fontWeight: FontWeight.bold, fontSize: 11, fontFamily: 'Inter'),
                                       ),
                                     );
                                   },
@@ -156,11 +158,11 @@ class _ExerciseProgressScreenState extends State<ExerciseProgressScreen> {
                               leftTitles: AxisTitles(
                                 sideTitles: SideTitles(
                                   showTitles: true,
-                                  reservedSize: 42,
+                                  reservedSize: 40,
                                   getTitlesWidget: (value, meta) {
                                     return Text(
                                       "${value.toInt()}kg",
-                                      style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold),
+                                      style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter'),
                                     );
                                   },
                                 ),
@@ -175,21 +177,21 @@ class _ExerciseProgressScreenState extends State<ExerciseProgressScreen> {
                               LineChartBarData(
                                 spots: _progressSpots,
                                 isCurved: true,
-                                color: accentCyan,
-                                barWidth: 4,
+                                color: accentGold,
+                                barWidth: 3.5,
                                 isStrokeCapRound: true,
                                 dotData: FlDotData(
                                   show: true,
                                   getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
-                                    radius: 5,
+                                    radius: 4,
                                     color: bgColor,
-                                    strokeWidth: 3,
-                                    strokeColor: accentCyan,
+                                    strokeWidth: 2.5,
+                                    strokeColor: accentGold,
                                   ),
                                 ),
                                 belowBarData: BarAreaData(
                                   show: true,
-                                  color: accentCyan.withOpacity(0.15),
+                                  color: accentGold.withValues(alpha:0.06),
                                 ),
                               ),
                             ],
@@ -208,11 +210,11 @@ class _ExerciseProgressScreenState extends State<ExerciseProgressScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text("Record Actuel", style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  Text("Record Actuel", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                                   const SizedBox(height: 4),
                                   Text(
-                                    "${_progressSpots.last.y} kg",
-                                    style: TextStyle(color: accentCyan, fontSize: 20, fontWeight: FontWeight.w900),
+                                    "${_progressSpots.last.y.toStringAsFixed(1)} kg",
+                                    style: TextStyle(color: accentGold, fontSize: 18, fontWeight: FontWeight.w900, fontFamily: 'Inter'),
                                   ),
                                 ],
                               ),
@@ -226,11 +228,11 @@ class _ExerciseProgressScreenState extends State<ExerciseProgressScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text("Progression totale", style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  Text("Progression totale", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                                   const SizedBox(height: 4),
                                   Text(
-                                    "+${_progressSpots.last.y - _progressSpots.first.y} kg",
-                                    style: const TextStyle(color: Colors.greenAccent, fontSize: 20, fontWeight: FontWeight.w900),
+                                    "+${(_progressSpots.last.y - _progressSpots.first.y).toStringAsFixed(1)} kg",
+                                    style: TextStyle(color: Colors.greenAccent.shade400, fontSize: 18, fontWeight: FontWeight.w900, fontFamily: 'Inter'),
                                   ),
                                 ],
                               ),
