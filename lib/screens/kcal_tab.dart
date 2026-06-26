@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../models/nutrition_model.dart';
 import 'add_food_screen.dart';
 import 'nutrition_setup_screen.dart';
