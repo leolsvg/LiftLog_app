@@ -452,7 +452,6 @@ class _NutritionScreenState extends State<NutritionScreen> {
                 'lipids_per_100g': int.tryParse(lipidsController.text) ?? 0,
               });
 
-              // 🦾 CORRECTIF : On s'assure que l'arbre des widgets est toujours actif avant de fermer la boîte de dialogue
               if (!context.mounted) return;
 
               Navigator.pop(context);
