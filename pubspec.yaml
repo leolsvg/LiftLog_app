@@ -28,6 +28,13 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1 # 🛠️ AJOUT : Le package de génération d'icônes
+
+# 🎯 CONFIGURATION DE TON ICÔNE GAIN
+flutter_launcher_icons:
+  image_path: "assets/img/logo.png" # 🖼️ On utilise ton logo existant
+  ios: true
+  android: true
 
 flutter:
   uses-material-design: true
@@ -38,6 +45,3 @@ flutter:
     - assets/img/min_logo.png
     - assets/img/logo_trans.png
     - assets/img/min_logo_trans.png
-
-
- 
