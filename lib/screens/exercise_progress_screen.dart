@@ -5,15 +5,32 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class WeightHistoryPoint {
   final DateTime date;
   final double weight;
+  final int reps;
+  final int rir;
 
-  WeightHistoryPoint({required this.date, required this.weight});
+  WeightHistoryPoint({
+    required this.date, 
+    required this.weight, 
+    required this.reps, 
+    required this.rir
+  });
+
+  // Calcule le 1RM théorique pour ce point précis
+  double get estimatedOneRepMax {
+    int totalReps = reps + rir;
+    if (totalReps <= 0) return weight;
+    return weight * (1 + (totalReps / 30.0));
+  }
 
   factory WeightHistoryPoint.fromSupabase(Map<String, dynamic> data) {
     final workoutDate = DateTime.parse(data['workout_exercises']['workouts']['created_at']);
     final weightParam = data['weight'].toString();
     final weight = double.tryParse(weightParam) ?? 0.0;
+    final reps = data['reps'] is int ? data['reps'] : int.tryParse(data['reps'].toString()) ?? 0;
+    // Récupération sécurisée du RIR (0 si nul)
+    final rir = data['rir'] is int ? data['rir'] : int.tryParse(data['rir'].toString()) ?? 0;
     
-    return WeightHistoryPoint(date: workoutDate, weight: weight);
+    return WeightHistoryPoint(date: workoutDate, weight: weight, reps: reps, rir: rir);
   }
 }
 
@@ -36,6 +53,7 @@ class _ExerciseProgressScreenState extends State<ExerciseProgressScreen> {
 
   List<FlSpot> _progressSpots = [];
   bool _isLoading = true;
+  double _highestOneRepMax = 0.0;
 
   @override
   void initState() {
@@ -45,10 +63,13 @@ class _ExerciseProgressScreenState extends State<ExerciseProgressScreen> {
 
   Future<void> _fetchRealProgressData() async {
     try {
+      // 🔌 MISE À REQUÊTE : On demande aussi reps et rir pour faire le calcul
       final response = await Supabase.instance.client
           .from('exercise_sets')
           .select('''
             weight,
+            reps,
+            rir,
             workout_exercises!inner(
               exercise_name,
               workouts!inner(created_at)
@@ -58,26 +79,32 @@ class _ExerciseProgressScreenState extends State<ExerciseProgressScreen> {
           .order('created_at', ascending: true);
 
       final List<dynamic> data = response as List<dynamic>;
-      Map<String, double> maxWeightPerDay = {};
+      Map<String, double> max1RMPerDay = {};
       
       for (var row in data) {
         final point = WeightHistoryPoint.fromSupabase(row);
         String dateKey = "${point.date.year}-${point.date.month}-${point.date.day}";
+        double calculated1RM = point.estimatedOneRepMax;
         
-        if (!maxWeightPerDay.containsKey(dateKey) || point.weight > maxWeightPerDay[dateKey]!) {
-          maxWeightPerDay[dateKey] = point.weight;
+        // On conserve le meilleur 1RM théorique calculé de la journée
+        if (!max1RMPerDay.containsKey(dateKey) || calculated1RM > max1RMPerDay[dateKey]!) {
+          max1RMPerDay[dateKey] = calculated1RM;
         }
       }
 
       List<FlSpot> spots = [];
       int index = 1;
-      maxWeightPerDay.forEach((date, maxWeight) {
-        spots.add(FlSpot(index.toDouble(), maxWeight));
+      double peak1RM = 0.0;
+
+      max1RMPerDay.forEach((date, max1RM) {
+        spots.add(FlSpot(index.toDouble(), max1RM));
+        if (max1RM > peak1RM) peak1RM = max1RM;
         index++;
       });
 
       setState(() {
         _progressSpots = spots;
+        _highestOneRepMax = peak1RM;
         _isLoading = false;
       });
     } catch (e) {
@@ -107,13 +134,13 @@ class _ExerciseProgressScreenState extends State<ExerciseProgressScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.exerciseName,
-                        style: TextStyle(color: textMain, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.5, fontFamily: 'Inter'),
+                        widget.exerciseName.toUpperCase(),
+                        style: TextStyle(color: textMain, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5, fontFamily: 'Inter'),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        "Évolution de ta charge maximale au fil des séances",
-                        style: TextStyle(color: textMuted, fontSize: 13, fontFamily: 'Inter'),
+                        "Évolution de ton 1RM maximal estimé (Formule d'Epley + RIR)",
+                        style: TextStyle(color: textMuted, fontSize: 12, fontFamily: 'Inter'),
                       ),
                       const SizedBox(height: 32),
 
@@ -158,7 +185,7 @@ class _ExerciseProgressScreenState extends State<ExerciseProgressScreen> {
                               leftTitles: AxisTitles(
                                 sideTitles: SideTitles(
                                   showTitles: true,
-                                  reservedSize: 40,
+                                  reservedSize: 42,
                                   getTitlesWidget: (value, meta) {
                                     return Text(
                                       "${value.toInt()}kg",
@@ -210,10 +237,10 @@ class _ExerciseProgressScreenState extends State<ExerciseProgressScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text("Record Actuel", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
+                                  Text("Record 1RM Estimé", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                                   const SizedBox(height: 4),
                                   Text(
-                                    "${_progressSpots.last.y.toStringAsFixed(1)} kg",
+                                    "${_highestOneRepMax.round()} kg",
                                     style: TextStyle(color: accentGold, fontSize: 18, fontWeight: FontWeight.w900, fontFamily: 'Inter'),
                                   ),
                                 ],
@@ -228,10 +255,10 @@ class _ExerciseProgressScreenState extends State<ExerciseProgressScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text("Progression totale", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
+                                  Text("Gain de force total", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                                   const SizedBox(height: 4),
                                   Text(
-                                    "+${(_progressSpots.last.y - _progressSpots.first.y).toStringAsFixed(1)} kg",
+                                    "+${(_progressSpots.last.y - _progressSpots.first.y).round()} kg",
                                     style: TextStyle(color: Colors.greenAccent.shade400, fontSize: 18, fontWeight: FontWeight.w900, fontFamily: 'Inter'),
                                   ),
                                 ],

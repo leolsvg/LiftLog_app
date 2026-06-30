@@ -7,9 +7,11 @@
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.lrenou.liftlog</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.lrenou.liftlog</string>
+				<string>liftlog</string>
 			</array>
 		</dict>
 	</array>

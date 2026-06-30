@@ -21,7 +21,7 @@ class WorkoutScreen extends StatefulWidget {
   State<WorkoutScreen> createState() => _WorkoutScreenState();
 }
 
-class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateMixin {
+class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
   List<bool> _isExpandedList = [];
 
   Timer? _restTimer;
@@ -30,12 +30,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
   AnimationController? _progressController;
   late DateTime _startTime;
 
-  // Signatures de style GAIN - Or & Anthracite unifié
+  // Signatures de style GAIN - Or & Anthracite sobre unifié
   final Color bgColor = const Color(0xFF191919);
   final Color cardColor = const Color(0xFF242424);
   final Color accentGold = const Color(0xFFC7AA0C);
   final Color textMain = Colors.white;
   final Color textMuted = const Color(0xFFA0AAB5);
+  final Color textHint = const Color(0xFF333333);
 
   List<Map<String, dynamic>> _dynamicExerciseCatalog = [];
   List<Map<String, dynamic>> _dynamicCardioCatalog = [];
@@ -43,16 +44,12 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _startTime = DateTime.now(); 
     _initializeExerciseCatalog(); 
     
     if (!widget.isEditing) {
-      for (var exercise in widget.session.exercises) {
-        for (var set in exercise.sets) {
-          set.isCompleted = false;
-        }
-      }
-      WidgetsBinding.instance.addPostFrameCallback((_) => widget.onSessionUpdated());
+      _restoreSessionState();
     }
 
     _isExpandedList = List.generate(widget.session.exercises.length, (index) => true);
@@ -65,9 +62,112 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _restTimer?.cancel();
     _progressController?.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _saveSessionState();
+    } else if (state == AppLifecycleState.resumed && !widget.isEditing) {
+      _restoreRestTimerOnResume();
+    }
+  }
+
+  Future<void> _saveSessionState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('gain_session_start_time', _startTime.toIso8601String());
+    
+    if (_currentRestSeconds > 0) {
+      final endTime = DateTime.now().add(Duration(seconds: _currentRestSeconds));
+      await prefs.setString('gain_timer_end_time', endTime.toIso8601String());
+      await prefs.setInt('gain_timer_total_seconds', _totalRestSeconds);
+    } else {
+      await prefs.remove('gain_timer_end_time');
+    }
+  }
+
+  Future<void> _restoreSessionState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedStart = prefs.getString('gain_session_start_time');
+    
+    if (savedStart != null) {
+      setState(() {
+        _startTime = DateTime.parse(savedStart);
+      });
+    } else {
+      for (var exercise in widget.session.exercises) {
+        for (var set in exercise.sets) {
+          set.isCompleted = false;
+        }
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) => widget.onSessionUpdated());
+    }
+    _restoreRestTimerOnResume();
+  }
+
+  Future<void> _restoreRestTimerOnResume() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedEndTime = prefs.getString('gain_timer_end_time');
+    final savedTotal = prefs.getInt('gain_timer_total_seconds') ?? 90;
+
+    if (savedEndTime != null) {
+      final endTime = DateTime.parse(savedEndTime);
+      final remainingSeconds = endTime.difference(DateTime.now()).inSeconds;
+
+      if (remainingSeconds > 0) {
+        setState(() {
+          _totalRestSeconds = savedTotal;
+          _currentRestSeconds = remainingSeconds;
+        });
+        _resumeRestTimer();
+      } else {
+        _clearSavedTimer();
+      }
+    }
+  }
+
+  void _resumeRestTimer() {
+    _restTimer?.cancel();
+    _progressController?.duration = Duration(seconds: _totalRestSeconds);
+    _progressController?.value = 1.0 - (_currentRestSeconds / _totalRestSeconds);
+    _progressController!.forward();
+
+    _restTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_currentRestSeconds > 1) {
+        setState(() {
+          _currentRestSeconds--;
+        });
+      } else {
+        _stopRestTimer();
+        _clearSavedTimer();
+        _showChronoDoneSnackbar();
+      }
+    });
+  }
+
+  Future<void> _clearSavedTimer() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('gain_timer_end_time');
+  }
+
+  Future<void> _clearAllSessionState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('gain_session_start_time');
+    await prefs.remove('gain_timer_end_time');
+  }
+
+  void _showChronoDoneSnackbar() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text("Chrono terminé 🦾", style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Inter', fontSize: 13, color: Colors.white)),
+        backgroundColor: accentGold,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _initializeExerciseCatalog() async {
@@ -83,22 +183,16 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
 
       if (existing.isEmpty) {
         final List<Map<String, dynamic>> defaultExercises = [
-          {'user_id': user.id, 'name': 'Développé Couché (Barre)', 'category': 'Pectoraux (Faisceau moyen)'},
-          {'user_id': user.id, 'name': 'Développé Incliné (Haltères)', 'category': 'Pectoraux (Faisceau supérieur)'},
-          {'user_id': user.id, 'name': 'Écarté à la poulie', 'category': 'Pectoraux (Portion basse)'},
-          {'user_id': user.id, 'name': 'Tractions (Poids de corps)', 'category': 'Grand Dorsal'},
-          {'user_id': user.id, 'name': 'Rowing Barre', 'category': 'Grand Dorsal & Trapèzes'},
-          {'user_id': user.id, 'name': 'Tirage Vertical (Poulie)', 'category': 'Grand Dorsal'},
-          {'user_id': user.id, 'name': 'Squat Gobelet / Barre', 'category': 'Quadriceps & Fessiers'},
-          {'user_id': user.id, 'name': 'Presse à cuisses', 'category': 'Quadriceps'},
-          {'user_id': user.id, 'name': 'Leg Curl (Ischios)', 'category': 'Ischio-jambiers'},
-          {'user_id': user.id, 'name': 'Développé Militaire', 'category': 'Deltoïde Antérieur'},
-          {'user_id': user.id, 'name': 'Élévations Latérales', 'category': 'Deltoïde Latéral'},
-          {'user_id': user.id, 'name': 'Curl Biceps (Haltères)', 'category': 'Biceps (Global)'},
-          {'user_id': user.id, 'name': 'Extension Triceps (Poulie)', 'category': 'Triceps (Chef latéral)'},
-          {'user_id': user.id, 'name': 'Crunch au sol', 'category': 'Grand Droit de l\'Abdomen'},
-          {'user_id': user.id, 'name': 'Course à pied', 'category': 'Cardio'},
-          {'user_id': user.id, 'name': 'Vélo', 'category': 'Cardio'},
+          {'user_id': user.id, 'name': 'Développé Couché (Barre)', 'category': 'Pectoraux'},
+          {'user_id': user.id, 'name': 'Développé Incliné (Haltères)', 'category': 'Pectoraux'},
+          {'user_id': user.id, 'name': 'Tractions (Poids de corps)', 'category': 'Dos'},
+          {'user_id': user.id, 'name': 'Rowing Barre', 'category': 'Dos'},
+          {'user_id': user.id, 'name': 'Squat Barre', 'category': 'Jambes'},
+          {'user_id': user.id, 'name': 'Presse à cuisses', 'category': 'Jambes'},
+          {'user_id': user.id, 'name': 'Développé Militaire', 'category': 'Épaules'},
+          {'user_id': user.id, 'name': 'Élévations Latérales', 'category': 'Épaules'},
+          {'user_id': user.id, 'name': 'Curl Biceps (Haltères)', 'category': 'Bras'},
+          {'user_id': user.id, 'name': 'Extension Triceps (Poulie)', 'category': 'Bras'},
         ];
         await Supabase.instance.client.from('exercises').insert(defaultExercises);
       }
@@ -153,6 +247,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
     _progressController?.reset();
     _progressController!.forward(); 
 
+    _saveSessionState();
+
     _restTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_currentRestSeconds > 1) {
         setState(() {
@@ -160,13 +256,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
         });
       } else {
         _stopRestTimer();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text("Chrono terminé. À la suite 🦾", style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Inter', fontSize: 13, color: Colors.white)),
-            backgroundColor: accentGold,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        _clearSavedTimer();
+        _showChronoDoneSnackbar();
       }
     });
   }
@@ -180,6 +271,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
       
       if (_currentRestSeconds == 0) {
         _stopRestTimer();
+        _clearSavedTimer();
         return;
       }
 
@@ -188,6 +280,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
       _progressController?.value = newValue.clamp(0.0, 1.0);
       _progressController!.forward();
     });
+    _saveSessionState();
   }
 
   void _stopRestTimer() {
@@ -197,12 +290,47 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
       _currentRestSeconds = 0;
       _totalRestSeconds = 90;
     });
+    _clearSavedTimer();
   }
 
   String _formatTime(int seconds) {
     final mins = seconds ~/ 60;
     final secs = seconds % 60;
     return "${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}";
+  }
+
+  void _showNoteDialog(String title, String currentNote, Function(String) onSave) {
+    final controller = TextEditingController(text: currentNote);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(title, style: TextStyle(color: textMain, fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
+        content: TextField(
+          controller: controller,
+          maxLines: 3,
+          style: TextStyle(color: textMain, fontFamily: 'Inter', fontSize: 14),
+          decoration: InputDecoration(
+            hintText: "Ressentis, blessures, objectifs...",
+            hintStyle: TextStyle(color: textMuted.withValues(alpha:0.5)),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Annuler', style: TextStyle(color: textMuted))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: bgColor, elevation: 0),
+            onPressed: () {
+              onSave(controller.text.trim());
+              Navigator.pop(context);
+            },
+            child: const Text('Enregistrer', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _saveWorkoutToSupabase() async {
@@ -216,6 +344,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
       'user_id': user.id,
       'name': widget.session.name,
       'duration_minutes': sessionDuration == 0 ? 1 : sessionDuration,
+      'notes': widget.session.notes,
     }).select().single();
 
     final workoutId = workoutResponse['id'];
@@ -227,6 +356,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
       final exerciseResponse = await supabase.from('workout_exercises').insert({
         'workout_id': workoutId,
         'exercise_name': exercise.name,
+        'notes': exercise.notes,
       }).select().single();
 
       final exerciseId = exerciseResponse['id'];
@@ -253,6 +383,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
 
     try {
       await _saveWorkoutToSupabase();
+      await _clearAllSessionState();
 
       final prefs = await SharedPreferences.getInstance();
       final now = DateTime.now();
@@ -282,7 +413,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Erreur cloud : $e", style: const TextStyle(color: Colors.white)),
-            backgroundColor: Colors.red.shade900,
+            backgroundColor: Colors.red[900],
           )
         );
       }
@@ -480,6 +611,51 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
       ),
       body: Column(
         children: [
+          if (!widget.isEditing)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+              child: InkWell(
+                onTap: () => _showNoteDialog(
+                  "Note globale de séance",
+                  session.notes ?? "",
+                  (val) {
+                    setState(() => session.notes = val.isNotEmpty ? val : null);
+                    widget.onSessionUpdated();
+                  }
+                ),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: cardColor.withValues(alpha:0.5),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: session.notes != null ? accentGold.withValues(alpha:0.3) : Colors.grey.shade900),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.notes_rounded, color: session.notes != null ? accentGold : textMuted, size: 16),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          session.notes ?? "Ajouter une note générale à cette séance...",
+                          style: TextStyle(
+                            color: session.notes != null ? textMain : textMuted.withValues(alpha:0.6),
+                            fontSize: 12,
+                            fontStyle: session.notes != null ? FontStyle.normal : FontStyle.italic,
+                            fontFamily: 'Inter'
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (session.notes != null)
+                        Icon(Icons.edit_rounded, color: accentGold, size: 12),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
           if (session.exercises.isEmpty)
             Expanded(
               child: Center(
@@ -514,6 +690,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                       side: BorderSide(color: allDone ? accentGold.withValues(alpha:0.4) : Colors.transparent, width: 1.0),
                     ),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         InkWell(
                           onTap: () => setState(() => _isExpandedList[exIndex] = !_isExpandedList[exIndex]),
@@ -575,6 +752,24 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                                     ],
                                   ),
                                 ),
+                                IconButton(
+                                  icon: Icon(
+                                    exercise.notes != null && exercise.notes!.isNotEmpty 
+                                        ? Icons.sticky_note_2_rounded 
+                                        : Icons.note_add_outlined,
+                                    size: 18,
+                                    color: exercise.notes != null && exercise.notes!.isNotEmpty ? accentGold : textMuted.withValues(alpha:0.4),
+                                  ),
+                                  onPressed: () => _showNoteDialog(
+                                    "Note pour ${exercise.name}",
+                                    exercise.notes ?? "",
+                                    (val) {
+                                      setState(() => exercise.notes = val.isNotEmpty ? val : null);
+                                      widget.onSessionUpdated();
+                                    }
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
                                 if (!widget.isEditing)
                                   Text(
                                     allDone ? 'FAIT' : '$completedSets / $totalSets',
@@ -609,7 +804,16 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                             ),
                           ),
                         ),
-                        
+                        if (exercise.notes != null && exercise.notes!.isNotEmpty && !isExpanded)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 12.0),
+                            child: Text(
+                              "📝 ${exercise.notes}",
+                              style: TextStyle(color: textMuted, fontSize: 11, fontStyle: FontStyle.italic, fontFamily: 'Inter'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         if (isExpanded)
                           Padding(
                             padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
@@ -617,12 +821,21 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Divider(height: 1, color: Colors.grey.shade900),
+                                if (exercise.notes != null && exercise.notes!.isNotEmpty) ...[
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    "Note : ${exercise.notes}",
+                                    style: TextStyle(color: textMuted.withValues(alpha:0.8), fontSize: 12, fontStyle: FontStyle.italic, fontFamily: 'Inter'),
+                                  ),
+                                ],
                                 const SizedBox(height: 12),
                                 Row(
                                   children: [
                                     Expanded(flex: 1, child: Text(exercise.isCardio ? 'TOUR' : 'SÉRIE', style: TextStyle(fontSize: 10, color: textMuted, fontWeight: FontWeight.bold, fontFamily: 'Inter'))),
-                                    Expanded(flex: 2, child: Text(exercise.isCardio ? 'MINUTES' : (widget.isEditing ? 'POIDS CIBLE' : 'KG'), style: TextStyle(fontSize: 10, color: textMuted, fontWeight: FontWeight.bold, fontFamily: 'Inter'))),
-                                    Expanded(flex: 2, child: Text(exercise.isCardio ? 'DISTANCE (KM)' : (widget.isEditing ? 'REPS CIBLE' : 'REPS'), style: TextStyle(fontSize: 10, color: textMuted, fontWeight: FontWeight.bold, fontFamily: 'Inter'))),
+                                    Expanded(flex: 2, child: Text(exercise.isCardio ? 'MINUTES' : (widget.isEditing ? 'REPS CIBLE' : 'REPS'), style: TextStyle(fontSize: 10, color: textMuted, fontWeight: FontWeight.bold, fontFamily: 'Inter'))),
+                                    Expanded(flex: 2, child: Text(exercise.isCardio ? 'DISTANCE (KM)' : (widget.isEditing ? 'POIDS CIBLE' : 'KG'), style: TextStyle(fontSize: 10, color: textMuted, fontWeight: FontWeight.bold, fontFamily: 'Inter'))),
+                                    if (!exercise.isCardio)
+                                      Expanded(flex: 1, child: Text('RIR', style: TextStyle(fontSize: 10, color: textMuted, fontWeight: FontWeight.bold, fontFamily: 'Inter'), textAlign: TextAlign.center)),
                                     if (!widget.isEditing)
                                       Expanded(flex: 1, child: Text('VALIDE', style: TextStyle(fontSize: 10, color: textMuted, fontWeight: FontWeight.bold, fontFamily: 'Inter'), textAlign: TextAlign.center)),
                                   ],
@@ -653,19 +866,19 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                                                 height: 36,
                                                 margin: const EdgeInsets.only(right: 12),
                                                 child: TextFormField(
-                                                  initialValue: exercise.isCardio ? currentSet.duration.toString() : currentSet.weight.toString(),
+                                                  initialValue: exercise.isCardio ? currentSet.duration.toString() : currentSet.reps.toString(),
                                                   keyboardType: TextInputType.number,
                                                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textMain, fontFamily: 'Inter'),
                                                   decoration: InputDecoration(
                                                     border: InputBorder.none,
-                                                    enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade900)),
+                                                    enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
                                                     focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
                                                   ),
                                                   onChanged: (val) {
                                                     if (exercise.isCardio) {
                                                       currentSet.duration = int.tryParse(val) ?? currentSet.duration;
                                                     } else {
-                                                      currentSet.weight = int.tryParse(val) ?? currentSet.weight;
+                                                      currentSet.reps = int.tryParse(val) ?? currentSet.reps;
                                                     }
                                                     widget.onSessionUpdated();
                                                   },
@@ -678,25 +891,54 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                                                 height: 36,
                                                 margin: const EdgeInsets.only(right: 12),
                                                 child: TextFormField(
-                                                  initialValue: exercise.isCardio ? currentSet.distance.toString() : currentSet.reps.toString(),
+                                                  initialValue: exercise.isCardio ? currentSet.distance.toString() : currentSet.weight.toString(),
                                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textMain, fontFamily: 'Inter'),
                                                   decoration: InputDecoration(
                                                     border: InputBorder.none,
-                                                    enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade900)),
+                                                    enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
                                                     focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
                                                   ),
                                                   onChanged: (val) {
                                                     if (exercise.isCardio) {
                                                       currentSet.distance = double.tryParse(val) ?? currentSet.distance;
                                                     } else {
-                                                      currentSet.reps = int.tryParse(val) ?? currentSet.reps;
+                                                      currentSet.weight = int.tryParse(val) ?? currentSet.weight;
                                                     }
                                                     widget.onSessionUpdated();
                                                   },
                                                 ),
                                               ),
                                             ),
+                                            if (!exercise.isCardio)
+                                              Expanded(
+                                                flex: 1,
+                                                child: Align(
+                                                  alignment: Alignment.center,
+                                                  child: DropdownButtonHideUnderline(
+                                                    child: DropdownButton<int>(
+                                                      dropdownColor: cardColor,
+                                                      value: currentSet.rir,
+                                                      hint: Text("-", style: TextStyle(color: textHint, fontSize: 14, fontWeight: FontWeight.bold)),
+                                                      icon: const SizedBox.shrink(),
+                                                      style: TextStyle(color: accentGold, fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'Inter'),
+                                                      onChanged: (int? newValue) {
+                                                        setState(() {
+                                                          currentSet.rir = newValue;
+                                                        });
+                                                        widget.onSessionUpdated();
+                                                        _saveSessionState();
+                                                      },
+                                                      items: [0, 1, 2, 3, 4].map<DropdownMenuItem<int>>((int value) {
+                                                        return DropdownMenuItem<int>(
+                                                          value: value,
+                                                          child: Text(value == 0 ? "0" : "$value"),
+                                                        );
+                                                      }).toList(),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
                                             if (!widget.isEditing)
                                               Expanded(
                                                 flex: 1,
@@ -751,7 +993,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                                       children: [
                                         Icon(Icons.add, size: 14, color: textMuted),
                                         const SizedBox(width: 4),
-                                        Text(exercise.isCardio ? 'Tour supplémentaire' : 'Série supplémentaire', style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
+                                        Text(exercise.isCardio ? 'Tour' : 'Série', style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                                       ],
                                     ),
                                   ),
@@ -765,7 +1007,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                 },
               ),
             ),
-
           if (_currentRestSeconds > 0)
             AnimatedBuilder(
               animation: _progressController!,
@@ -818,7 +1059,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                 );
               },
             ),
-
           if (widget.isEditing)
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -837,7 +1077,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                 ),
               ),
             ),
-
           if (!widget.isEditing && session.exercises.isNotEmpty)
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -847,7 +1086,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                 child: OutlinedButton(
                   onPressed: _finishWorkout,
                   style: OutlinedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E211A), // Fond velours sombre
+                    backgroundColor: const Color(0xFF1E211A), 
                     side: BorderSide(color: accentGold.withValues(alpha:0.5), width: 0.8),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),

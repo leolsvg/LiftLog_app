@@ -195,9 +195,12 @@ class _NutritionScreenState extends State<NutritionScreen> {
     }
   }
 
+  // 🦾 MISE À JOUR : Calculateur intelligent avec Autocomplete prédictif pour les ingrédients
   void _showCreateMealWithCalculator() {
     final mealNameController = TextEditingController();
     final weightController = TextEditingController();
+    final foodSearchController = TextEditingController();
+    
     Map<String, dynamic>? selectedFood;
     List<RecipeIngredient> tempIngredients = [];
     int totalKcal = 0, totalProt = 0, totalCarbs = 0, totalLipids = 0;
@@ -219,7 +222,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               title: Text("Nouveau plat composé", style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Inter')),
               content: SizedBox(
-                width: double.maxFinite,
+                width: MediaQuery.of(context).size.width * 0.85,
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -229,31 +232,83 @@ class _NutritionScreenState extends State<NutritionScreen> {
                         controller: mealNameController, 
                         style: TextStyle(color: textMain, fontFamily: 'Inter'), 
                         decoration: InputDecoration(
-                          labelText: "Nom du plat (ex: Riz Poulet Curry)", 
+                          labelText: "Nom de la recette", 
                           labelStyle: TextStyle(color: textMuted, fontSize: 13),
                           enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
                           focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
                         ),
                       ),
                       const SizedBox(height: 24),
-                      Text("AJOUTER UN ALIMENT", style: TextStyle(color: accentGold, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5, fontFamily: 'Inter')),
+                      Text("AJOUTER UN INGRÉDIENT", style: TextStyle(color: accentGold, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5, fontFamily: 'Inter')),
                       const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10)),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<Map<String, dynamic>>(
-                            dropdownColor: cardColor,
-                            hint: Text("Choisir un ingrédient...", style: TextStyle(color: textMuted, fontSize: 13, fontFamily: 'Inter')),
-                            value: selectedFood,
-                            isExpanded: true,
-                            items: _foodCatalog.map((food) {
-                              return DropdownMenuItem<Map<String, dynamic>>(value: food, child: Text("${food['name']} (100g)", style: TextStyle(color: textMain, fontSize: 13, fontFamily: 'Inter')));
-                            }).toList(),
-                            onChanged: (value) => setDialogState(() => selectedFood = value),
-                          ),
-                        ),
+                      
+                      // 🔍 Moteur de recherche d'ingrédients prédictif
+                      Autocomplete<Map<String, dynamic>>(
+                        displayStringForOption: (option) => option['name'] ?? '',
+                        optionsBuilder: (TextEditingValue textEditingValue) {
+                          if (textEditingValue.text.isEmpty) return const Iterable<Map<String, dynamic>>.empty();
+                          return _foodCatalog.where((food) => (food['name'] as String).toLowerCase().contains(textEditingValue.text.toLowerCase()));
+                        },
+                        onSelected: (Map<String, dynamic> selection) {
+                          setDialogState(() => selectedFood = selection);
+                        },
+                        fieldViewBuilder: (context, fieldTextEditingController, focusNode, onFieldSubmitted) {
+                          return TextField(
+                            controller: fieldTextEditingController,
+                            focusNode: focusNode,
+                            style: TextStyle(color: textMain, fontSize: 13, fontFamily: 'Inter'),
+                            decoration: InputDecoration(
+                              hintText: "Taper pour chercher (ex: Riz, Poulet...)",
+                              hintStyle: TextStyle(color: textMuted.withValues(alpha:0.5), fontSize: 13),
+                              filled: true,
+                              fillColor: bgColor,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                          );
+                        },
+                        optionsViewBuilder: (context, onSelected, options) {
+  return Align(
+    alignment: Alignment.topLeft,
+    child: Material(
+      color: cardColor,
+      elevation: 4.0,
+      borderRadius: BorderRadius.circular(10),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 180),
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.68,
+          // 🏛️ CORRECT : On déplace la bordure et l'arrondi dans le BoxDecoration
+          decoration: BoxDecoration(
+            color: cardColor, // Optionnel, assure la continuité de la couleur
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.grey.shade900),
+          ),
+          child: ClipRRect(
+            // Reste propre : évite que les ListTiles ne dépassent des bords arrondis
+            borderRadius: BorderRadius.circular(10),
+            child: ListView.builder(
+              padding: EdgeInsets.zero,
+              shrinkWrap: true,
+              itemCount: options.length,
+              itemBuilder: (context, index) {
+                final option = options.elementAt(index);
+                return ListTile(
+                  dense: true,
+                  title: Text(option['name'] ?? '', style: TextStyle(color: textMain, fontSize: 13, fontWeight: FontWeight.bold)),
+                  subtitle: Text('${option['kcal_per_100g']} kcal / 100g', style: TextStyle(color: textMuted, fontSize: 11)),
+                  onTap: () => onSelected(option),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+},
                       ),
+                      
                       const SizedBox(height: 12),
                       Row(
                         children: [
@@ -266,7 +321,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
                                 controller: weightController,
                                 keyboardType: TextInputType.number,
                                 style: TextStyle(color: textMain, fontSize: 14, fontFamily: 'Inter'),
-                                decoration: InputDecoration(labelText: "Poids (g)", labelStyle: TextStyle(color: textMuted, fontSize: 11), border: InputBorder.none, contentPadding: EdgeInsets.zero),
+                                decoration: InputDecoration(labelText: "Poids pesé (g)", labelStyle: TextStyle(color: textMuted, fontSize: 11), border: InputBorder.none, contentPadding: EdgeInsets.zero),
                               ),
                             ),
                           ),
@@ -289,6 +344,8 @@ class _NutritionScreenState extends State<NutritionScreen> {
                                   recalculateTotals();
                                   weightController.clear();
                                   selectedFood = null;
+                                  // Écrase le texte de l'auto-complete pour l'élément suivant
+                                  FocusScope.of(context).unfocus();
                                 });
                               },
                               child: Text("Ajouter", style: TextStyle(color: accentGold, fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'Inter')),
@@ -301,7 +358,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
                         Text("COMPOSITION DU PLAT", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5, fontFamily: 'Inter')),
                         const SizedBox(height: 8),
                         Container(
-                          constraints: const BoxConstraints(maxHeight: 120),
+                          constraints: const BoxConstraints(maxHeight: 150),
                           child: ListView.builder(
                             shrinkWrap: true,
                             itemCount: tempIngredients.length,
@@ -323,12 +380,12 @@ class _NutritionScreenState extends State<NutritionScreen> {
                                   });
                                 },
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                  padding: const EdgeInsets.symmetric(vertical: 6.0),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text("${ing.name} (${ing.weight}g)", style: TextStyle(color: textMain, fontSize: 13, fontFamily: 'Inter')),
-                                      Text("${ing.kcal} kcal", style: TextStyle(color: textMuted, fontSize: 13, fontFamily: 'Inter')),
+                                      Text("+${ing.kcal} kcal", style: TextStyle(color: accentGold, fontWeight: FontWeight.w600, fontSize: 13, fontFamily: 'Inter')),
                                     ],
                                   ),
                                 ),
@@ -344,15 +401,15 @@ class _NutritionScreenState extends State<NutritionScreen> {
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10)),
+                        decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10), border: Border.all(color: accentGold.withValues(alpha:0.15))),
                         child: Column(
                           children: [
-                            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text("Calories totales :", style: TextStyle(color: textMuted, fontSize: 12, fontFamily: 'Inter')), Text("$totalKcal kcal", style: TextStyle(color: accentGold, fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'Inter'))]),
+                            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text("Total Recette :", style: TextStyle(color: textMuted, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Inter')), Text("$totalKcal kcal", style: TextStyle(color: textMain, fontWeight: FontWeight.w900, fontSize: 15, fontFamily: 'Inter'))]),
                             const SizedBox(height: 8),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text("P: ${totalProt}g", style: TextStyle(color: textMain, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
+                                Text("P: ${totalProt}g", style: TextStyle(color: accentGold, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                                 Text("G: ${totalCarbs}g", style: TextStyle(color: textMain, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                                 Text("L: ${totalLipids}g", style: TextStyle(color: textMain, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                               ],
@@ -380,7 +437,6 @@ class _NutritionScreenState extends State<NutritionScreen> {
                     final user = _supabase.auth.currentUser;
                     if (user == null || mealNameController.text.trim().isEmpty || tempIngredients.isEmpty) return;
 
-                    // 1. Capture de l'instance de navigation AVANT le gap asynchrone
                     final navigator = Navigator.of(context);
 
                     final meal = CustomMeal(
@@ -393,10 +449,8 @@ class _NutritionScreenState extends State<NutritionScreen> {
                     
                     await _supabase.from('custom_meals').insert(meal.toMap(user.id));
                     
-                    // 2. Vérification réglementaire du BuildContext après le await
                     if (!context.mounted) return;
 
-                    // 3. Utilisation de la référence locale sécurisée
                     navigator.pop();
                     _loadAllData();
                   },

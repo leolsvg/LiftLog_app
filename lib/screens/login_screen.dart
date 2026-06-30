@@ -65,10 +65,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> signInWithApple() async {
     try {
-      await _supabase.auth.signInWithOAuth(
-        OAuthProvider.apple,
-        redirectTo: 'com.tonnom.liftlog://login-callback',
-      );
+      await Supabase.instance.client.auth.signInWithOAuth(
+  OAuthProvider.apple,
+  redirectTo: 'liftlog://login-callback',
+);
       debugPrint("🔥 Connexion Apple réussie !");
     } catch (e) {
       debugPrint("❌ Erreur Connexion Apple : $e");

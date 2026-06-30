@@ -89,20 +89,22 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   // Inscription Sociale (Apple)
-  Future<void> _handleSocialSignIn(OAuthProvider provider) async {
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await _supabase.auth.signInWithOAuth(
-        provider,
-        redirectTo: 'com.tonnom.liftlog://login-callback', 
-      );
-    } on AuthException catch (e) {
-      if (!context.mounted) return; 
-      messenger.showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
-      );
-    }
+Future<void> _handleSocialSignIn(OAuthProvider provider) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    await _supabase.auth.signInWithOAuth(
+      provider,
+      // 💡 ALIGNEMENT : On utilise le protocole d'écoute configuré dans l'Info.plist
+      redirectTo: 'liftlog://login-callback', 
+    );
+  } on AuthException catch (e) {
+    if (!context.mounted) return; 
+    messenger.showSnackBar(
+      SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
+    );
   }
+}
+  
 
   @override
   Widget build(BuildContext context) {

@@ -48,8 +48,6 @@ class _KcalTabState extends State<KcalTab> {
   final Color textMain = Colors.white;
   final Color textMuted = const Color(0xFFA0AAB5);
 
- 
-
   @override
   void initState() {
     super.initState();
@@ -264,7 +262,7 @@ class _KcalTabState extends State<KcalTab> {
                   'target_lipids': int.tryParse(lipidsController.text) ?? 80,
                 });
                 if (context.mounted) Navigator.pop(context);
-                _loadSupabaseTargets(); 
+                await _loadSupabaseTargets(); 
               } catch (e) {
                 debugPrint("Erreur sauvegarde manuelle : $e");
               }
