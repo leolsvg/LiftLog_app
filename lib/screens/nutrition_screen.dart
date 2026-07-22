@@ -199,7 +199,6 @@ class _NutritionScreenState extends State<NutritionScreen> {
   void _showCreateMealWithCalculator() {
     final mealNameController = TextEditingController();
     final weightController = TextEditingController();
-    final foodSearchController = TextEditingController();
     
     Map<String, dynamic>? selectedFood;
     List<RecipeIngredient> tempIngredients = [];

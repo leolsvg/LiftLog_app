@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/workout_model.dart';
+
 import 'login_screen.dart';
 
 class AccountScreen extends StatefulWidget {
@@ -129,6 +131,13 @@ class _AccountScreenState extends State<AccountScreen> {
   Future<void> _importWorkoutHistory() async {
     if (_user == null) return;
 
+    int asInt(dynamic value, {int fallback = 0}) {
+      if (value is int) return value;
+      if (value is double) return value.round();
+      if (value is String) return int.tryParse(value) ?? fallback;
+      return fallback;
+    }
+
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['json'],
@@ -141,39 +150,139 @@ class _AccountScreenState extends State<AccountScreen> {
     try {
       File file = File(result.files.single.path!);
       String content = await file.readAsString();
-      List<dynamic> importedWorkouts = jsonDecode(content);
+      dynamic parsedJson = jsonDecode(content);
+
+      List<dynamic> importedWorkouts = [];
+      List<dynamic> importedTemplates = [];
+      List<dynamic> customExercises = [];
+
+      if (parsedJson is Map<String, dynamic>) {
+        importedWorkouts = parsedJson['history'] ?? [];
+        importedTemplates = parsedJson['templates'] ?? [];
+        customExercises = parsedJson['custom_exercises'] ?? [];
+      } else if (parsedJson is List<dynamic>) {
+        importedWorkouts = parsedJson;
+      }
+
+      // 1. ENREGISTREMENT DES EXERCICES PERSONNALISÉS
+      final Set<String> allExerciseNames = {};
+
+      for (var e in customExercises) {
+        if (e != null && e.toString().isNotEmpty) {
+          allExerciseNames.add(e.toString());
+        }
+      }
 
       for (var session in importedWorkouts) {
-        final workoutResponse = await _supabase.from('workouts').insert({
-          'user_id': _user!.id,
-          'name': session['workout_name'] ?? 'Séance Importée',
-          'duration_minutes': session['duration'] ?? 60,
-          'created_at': session['date'], 
-        }).select('id').single();
-
-        final int workoutId = workoutResponse['id'];
-
         List<dynamic> sets = session['sets'] ?? [];
         for (var set in sets) {
-          await _supabase.from('workout_exercises').insert({
-            'workout_id': workoutId,
-            'exercise_name': set['exercise_name'],
-            'set_number': set['set_number'] ?? set['set_index'],
-            'weight': (set['weight'] as num).toDouble(),
-            'reps': set['reps'] as int,
+          if (set['exercise_name'] != null) {
+            allExerciseNames.add(set['exercise_name'].toString());
+          }
+        }
+      }
+
+      for (var exName in allExerciseNames) {
+        try {
+          await _supabase.from('custom_exercises').upsert({
+            'user_id': _user!.id,
+            'name': exName,
           });
+        } catch (_) {}
+      }
+
+      // 2. IMPORTATION DES PROGRAMMES / TEMPLATES
+      if (importedTemplates.isNotEmpty) {
+        for (var tpl in importedTemplates) {
+          final String templateName = tpl['name'] ?? 'Programme Importé';
+          final List<dynamic> rawExoList = tpl['exercises'] ?? [];
+
+          final List<Exercise> exerciseObjects = rawExoList.map((exoName) {
+            return Exercise.createTarget(
+              name: exoName.toString(),
+              targetSets: 3,
+              targetReps: 10,
+            );
+          }).toList();
+
+          await _supabase.from('workout_templates').insert({
+            'user_id': _user!.id,
+            'name': templateName,
+            'exercises': exerciseObjects.map((e) => e.toJson()).toList(),
+          });
+        }
+      }
+
+      // 3. IMPORTATION DE L'HISTORIQUE (AVEC CHAMPS COMPLETS)
+      for (var session in importedWorkouts) {
+        final String sessionName = session['workout_name'] ?? 'Séance Importée';
+        
+        final workoutResponse = await _supabase.from('workouts').insert({
+          'user_id': _user!.id,
+          'name': sessionName,
+          'duration_minutes': asInt(session['duration'], fallback: 60),
+          'created_at': session['date'],
+        }).select('id').single();
+
+        final workoutId = workoutResponse['id'];
+        List<dynamic> rawSets = session['sets'] ?? [];
+
+        // Regroupement des séries par exercice
+        final Map<String, List<dynamic>> groupedSets = {};
+        for (var set in rawSets) {
+          final String exName = set['exercise_name'] ?? 'Exercice Importé';
+          groupedSets.putIfAbsent(exName, () => []);
+          groupedSets[exName]!.add(set);
+        }
+
+        for (var entry in groupedSets.entries) {
+          final String exerciseName = entry.key;
+          final List<dynamic> exerciseSets = entry.value;
+
+          final exerciseResponse = await _supabase.from('workout_exercises').insert({
+            'workout_id': workoutId,
+            'exercise_name': exerciseName,
+            'notes': exerciseSets.first['notes'],
+          }).select('id').single();
+
+          final exerciseId = exerciseResponse['id'];
+
+          for (var set in exerciseSets) {
+            final int setOrder = asInt(set['set_number'] ?? set['set_index'], fallback: 1);
+            final int reps = asInt(set['reps']);
+            final int weight = asInt(set['weight']);
+            final int rir = asInt(set['rir'], fallback: 0);
+
+            // 💡 Insertion complète avec is_completed = true
+            await _supabase.from('exercise_sets').insert({
+              'exercise_id': exerciseId,
+              'weight': weight,
+              'reps': reps,
+              'set_order': setOrder,
+              'is_completed': true, // 👈 Permet l'affichage dans l'historique et le graphique
+              'rir': rir,
+            });
+          }
         }
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Historique d'entraînement synchronisé ! 🔥", style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold)), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text("Importation réussie ! Données complètement synchronisées. 🔥",
+              style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold)),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erreur lors du traitement : $e", style: const TextStyle(fontFamily: 'Inter')), backgroundColor: Colors.redAccent),
+          SnackBar(
+            content: Text("Erreur lors de l'importation : $e",
+              style: const TextStyle(fontFamily: 'Inter')),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     } finally {

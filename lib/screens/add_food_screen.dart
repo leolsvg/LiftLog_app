@@ -113,9 +113,10 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
       'search_simple': '1',
       'action': 'process',
       'json': '1',
-      'page_size': '20',
-      'sort_by': 'popularity',
-      'fields': 'product_name_fr,product_name,nutriments,image_front_small_url',
+      'page_size': '25',
+      'sort_by': 'unique_scans_n', // Trie par popularité réelle des scans pour remonter le basique en premier
+      'fields': 'product_name_fr,product_name,nutriments,image_front_small_url,brands',
+      'countries_tags': 'en:france', // Cible le catalogue français en priorité
     });
 
     final response = await http.get(url, headers: _apiHeaders).timeout(const Duration(seconds: 10));
@@ -147,25 +148,52 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     });
 
     try {
+      List<FoodItem> finalResults = [];
+
+      // 1️⃣ Recherche locale prioritaire dans "Mes plats fréquents" avec tous les arguments requis
+      final String normalizedQuery = query.toLowerCase().trim();
+      final localMatches = _savedCustomMeals.where((meal) {
+        final String mealName = (meal['name'] ?? '').toString().toLowerCase();
+        return mealName.contains(normalizedQuery);
+      }).toList();
+
+      for (var meal in localMatches) {
+        finalResults.add(
+          FoodItem(
+            name: "⭐️ ${meal['name']}",
+            kcalPer100g: (meal['kcal'] as num? ?? 0).toDouble(),
+            protPer100g: (meal['proteins'] as num? ?? 0).toDouble(),
+            carbsPer100g: (meal['carbs'] as num? ?? 0).toDouble(),
+            lipidsPer100g: (meal['lipids'] as num? ?? 0).toDouble(),
+            imageUrl: null,
+          ),
+        );
+      }
+
+      // 2️⃣ Recherche dans le cache local (SharedPreferences)
       final cachedResults = await _loadCachedSearchResults(query);
       if (cachedResults != null && cachedResults.isNotEmpty) {
+        finalResults.addAll(cachedResults);
         setState(() {
-          _searchResults = cachedResults;
+          _searchResults = finalResults;
         });
         return;
       }
 
-      List<FoodItem> results;
+      // 3️⃣ Requête distante avec l'API Open Food Facts
+      List<FoodItem> apiResults;
       try {
-        results = await _fetchFoodsFromOpenFoodFacts(query, host: 'world.openfoodfacts.org');
+        apiResults = await _fetchFoodsFromOpenFoodFacts(query, host: 'fr.openfoodfacts.org');
       } catch (_) {
-        results = await _fetchFoodsFromOpenFoodFacts(query, host: 'fr.openfoodfacts.org');
+        apiResults = await _fetchFoodsFromOpenFoodFacts(query, host: 'world.openfoodfacts.org');
       }
 
+      finalResults.addAll(apiResults);
+
       setState(() {
-        _searchResults = results;
+        _searchResults = finalResults;
       });
-      await _saveCachedSearchResults(query, results);
+      await _saveCachedSearchResults(query, apiResults);
     } catch (e) {
       _showError("Open Food Facts est temporairement indisponible.");
     } finally {
@@ -195,7 +223,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
     try {
       Map<String, dynamic>? product;
 
-      for (final host in ['world.openfoodfacts.org', 'fr.openfoodfacts.org']) {
+      for (final host in ['fr.openfoodfacts.org', 'world.openfoodfacts.org']) {
         try {
           final url = Uri.https(host, '/api/v0/product/$barcode.json');
           final response = await http.get(url, headers: _apiHeaders).timeout(const Duration(seconds: 10));
@@ -361,7 +389,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
         iconTheme: IconThemeData(color: textMain),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0), // 👈 On garde uniquement celui-ci
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -599,7 +627,7 @@ class _AddFoodScreenState extends State<AddFoodScreen> {
             ]
           ],
         ),
-      ), // 🦾 Ici, le deuxième "padding:" en trop a été supprimé proprement
+      ),
     );
   }
 

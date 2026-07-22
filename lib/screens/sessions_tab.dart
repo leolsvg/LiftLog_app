@@ -8,6 +8,8 @@ class SessionsTab extends StatelessWidget {
   final Function(WorkoutSession) onEditSession;
   final Function(int) onDeleteSession;
   final VoidCallback onCreateSession;
+  // 🖐️ NOUVEAU : Callback pour enregistrer le réordonnancement
+  final Function(int oldIndex, int newIndex) onReorderSessions;
 
   const SessionsTab({
     super.key,
@@ -16,6 +18,7 @@ class SessionsTab extends StatelessWidget {
     required this.onEditSession,
     required this.onDeleteSession,
     required this.onCreateSession,
+    required this.onReorderSessions,
   });
 
   @override
@@ -80,15 +83,21 @@ class SessionsTab extends StatelessWidget {
             Expanded(
               child: sessions.isEmpty
                   ? _buildEmpty(context, bgColor, cardColor, accentGold, textMain, textMuted)
-                  : ListView.separated(
+                  // 🖐️ REORDERABLE LIST VIEW (Remplaçant du ListView.separated)
+                  : ReorderableListView.builder(
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                       itemCount: sessions.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      onReorder: (oldIndex, newIndex) {
+                        onReorderSessions(oldIndex, newIndex);
+                      },
                       itemBuilder: (context, index) {
                         final session = sessions[index];
                         final exerciseCount = session.exercises.length;
 
                         return Container(
+                          // 🔑 Chaque élément doit avoir une clé unique
+                          key: ValueKey('${session.name}_$index'),
+                          margin: const EdgeInsets.only(bottom: 10),
                           decoration: BoxDecoration(
                             color: cardColor,
                             borderRadius: BorderRadius.circular(14),
@@ -100,19 +109,36 @@ class SessionsTab extends StatelessWidget {
                               borderRadius: BorderRadius.circular(14),
                               onTap: () => onLaunchSession(session),
                               child: Padding(
-                                padding: const EdgeInsets.all(14),
+                                padding: const EdgeInsets.all(12),
                                 child: Row(
                                   children: [
+                                    // 🖐️ Poignée de glissement (Drag Handle)
+                                    ReorderableDragStartListener(
+                                      index: index,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                                        child: Icon(
+                                          Icons.drag_indicator_rounded,
+                                          color: textMuted.withValues(alpha: 0.4),
+                                          size: 20,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+
+                                    // Icône Programme
                                     Container(
-                                      width: 42,
-                                      height: 42,
+                                      width: 40,
+                                      height: 40,
                                       decoration: BoxDecoration(
                                         color: bgColor,
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Icon(Icons.fitness_center_rounded, color: accentGold, size: 18),
                                     ),
-                                    const SizedBox(width: 14),
+                                    const SizedBox(width: 12),
+
+                                    // Titre & Nb d'exercices
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,7 +164,8 @@ class SessionsTab extends StatelessWidget {
                                         ],
                                       ),
                                     ),
-                                    const SizedBox(width: 10),
+
+                                    // Actions (Éditer / Supprimer / Lancer)
                                     Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -232,7 +259,7 @@ class SessionsTab extends StatelessWidget {
                   color: bgColor,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.event_busy_rounded, color: textMuted.withValues(alpha:0.5), size: 24),
+                child: Icon(Icons.event_busy_rounded, color: textMuted.withValues(alpha: 0.5), size: 24),
               ),
               const SizedBox(height: 16),
               Text(

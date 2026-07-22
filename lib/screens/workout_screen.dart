@@ -670,9 +670,23 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
             )
           else
             Expanded(
-              child: ListView.builder(
+              // 🖐️ REORDERABLE LIST VIEW POUR RÉORDONNER LES EXERCICES
+              child: ReorderableListView.builder(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 itemCount: session.exercises.length,
+                onReorder: (oldIndex, newIndex) {
+                  setState(() {
+                    if (newIndex > oldIndex) {
+                      newIndex -= 1;
+                    }
+                    final exercise = session.exercises.removeAt(oldIndex);
+                    session.exercises.insert(newIndex, exercise);
+
+                    final expandedState = _isExpandedList.removeAt(oldIndex);
+                    _isExpandedList.insert(newIndex, expandedState);
+                  });
+                  widget.onSessionUpdated();
+                },
                 itemBuilder: (context, exIndex) {
                   final exercise = session.exercises[exIndex];
                   final bool isExpanded = _isExpandedList[exIndex];
@@ -682,6 +696,8 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                   final bool allDone = totalSets > 0 && completedSets == totalSets && !widget.isEditing;
 
                   return Card(
+                    // 🔑 Clé unique requise par ReorderableListView
+                    key: ValueKey('exercise_${exercise.name}_$exIndex'),
                     margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
                     color: cardColor,
                     elevation: 0,
@@ -699,6 +715,18 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                             padding: const EdgeInsets.all(16.0),
                             child: Row(
                               children: [
+                                // 🖐️ Poignée de glissement (Drag Handle)
+                                ReorderableDragStartListener(
+                                  index: exIndex,
+                                  child: Container(
+                                    padding: const EdgeInsets.only(right: 12.0),
+                                    child: Icon(
+                                      Icons.drag_indicator_rounded,
+                                      color: textMuted.withValues(alpha: 0.4),
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,

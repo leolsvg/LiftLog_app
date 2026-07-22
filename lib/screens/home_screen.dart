@@ -160,7 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onLaunchSession: (s) => Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutScreen(session: s, onSessionUpdated: _syncSessionsToSupabase))),
         onEditSession: (s) => Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutScreen(session: s, onSessionUpdated: _syncSessionsToSupabase, isEditing: true))),
         onDeleteSession: _deleteSessionDialog,
-        onCreateSession: _showCreateSessionDialog,
+        onCreateSession: _showCreateSessionDialog, onReorderSessions: (int oldIndex, int newIndex) {  },
       ),
       DashboardTab(
         nextSessionName: _allSessions.isNotEmpty ? _allSessions[_selectedSessionIndex].name : "Aucune",

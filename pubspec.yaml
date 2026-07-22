@@ -2,7 +2,7 @@ name: gain
 description: Une app de muscu et nutrition premium.
 publish_to: 'none'
 
-version: 1.2.1+10
+version: 1.2.2+10
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -23,6 +23,7 @@ dependencies:
   fl_chart: ^1.2.0           # Mis à jour pour SPM
   intl: ^0.20.2              # Mis à jour pour SPM
   file_picker: ^8.3.7        # Mis à jour pour forcer la compatibilité iOS 14+
+  app_links: ^6.0.0
 
 dev_dependencies:
   flutter_test:

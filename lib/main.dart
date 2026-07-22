@@ -1,19 +1,47 @@
 import 'dart:async';
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/home_screen.dart';    
 import 'screens/login_screen.dart';   
 import 'package:intl/date_symbol_data_local.dart';
 
+StreamSubscription<Uri>? _oauthLinkSubscription;
+
+Future<void> _handleOAuthDeepLink() async {
+  final appLinks = AppLinks();
+
+  try {
+    final initialUri = await appLinks.getInitialLink();
+    if (initialUri != null) {
+      await Supabase.instance.client.auth.getSessionFromUrl(initialUri);
+    }
+  } catch (e) {
+    debugPrint('❌ Erreur de traitement du deep link OAuth : $e');
+  }
+
+  _oauthLinkSubscription ??= appLinks.uriLinkStream.listen((uri) async {
+    try {
+      await Supabase.instance.client.auth.getSessionFromUrl(uri);
+    } catch (e) {
+      debugPrint('❌ Erreur de traitement du deep link OAuth en temps réel : $e');
+    }
+  });
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('fr_FR', null);
 
-  // Initialisation de Supabase
   await Supabase.initialize(
-    url: 'https://nrmogmelctormagxyady.supabase.co', 
+    url: 'https://nrmogmelctormagxyady.supabase.co',
     publishableKey: 'sb_publishable_TE9Nnew2r_TAyT3vAM3_-g_1nqCuU_q',
+    authOptions: const FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.pkce,
+    ),
   );
+
+  await _handleOAuthDeepLink();
 
   runApp(const MyApp());
 }
@@ -31,14 +59,14 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF191919),
-        fontFamily: 'Inter', // Ta police d'interface par défaut
+        fontFamily: 'Inter',
       ),
-      home: const AuthGate(), // 👈 L'aiguillage est géré ici de manière isolée
+      home: const AuthGate(),
     );
   }
 }
 
-// 🛡️ COMPOSANT D'AIGUILLAGE LUXE ET SÉCURISÉ
+// 🛡️ COMPOSANT D'AIGUILLAGE SECURISE
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
@@ -64,16 +92,17 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   void _listenToAuthChanges() {
-    // On récupère la session actuelle de manière statique une première fois
+    // Initialisation synchrone du user actuel
     final initialSession = supabase.auth.currentSession;
     _currentUserId = initialSession?.user.id;
 
-    // On écoute les changements uniques
+    // Écoute fluide des événements d'authentification
     _authSubscription = supabase.auth.onAuthStateChange.listen((data) {
       debugPrint("🔄 [GAIN Auth] Changement d'état détecté : ${data.event}");
+      
       final newUserId = data.session?.user.id;
 
-      // 🌟 PROTECTION CRITIQUE : On ne reconstruit l'UI que si l'identité de l'utilisateur a VRAIMENT changé
+      // Déclenche le passage à l'accueil sur SIGNED_IN ou si l'ID change
       if (!_initialized || _currentUserId != newUserId) {
         if (mounted) {
           setState(() {
@@ -87,31 +116,31 @@ class _AuthGateState extends State<AuthGate> {
       if (mounted) setState(() => _initialized = true);
     });
 
-    // Stabilisation du démarrage initial
+    // Stabilisation immédiate au boot
     Future.delayed(Duration.zero, () {
       if (mounted && !_initialized) {
-        setState(() => _initialized = true);
+        setState(() {
+          _initialized = true;
+        });
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // Écran de chargement épuré haut de gamme
     if (!_initialized) {
       return const Scaffold(
-        backgroundColor: Color(0xFF13171C),
+        backgroundColor: Color(0xFF191919),
         body: Center(
           child: SizedBox(
             width: 22,
-            height: 24,
-            child: CircularProgressIndicator(color: Color(0xFF38B6FF), strokeWidth: 2),
+            height: 22,
+            child: CircularProgressIndicator(color: Color(0xFFC7AA0C), strokeWidth: 2), // Aligné sur ton accentGold
           ),
         ),
       );
     }
 
-    // Si on a un ID utilisateur valide -> Accueil, sinon -> Écran de connexion
     return _currentUserId != null ? const HomeScreen() : const LoginScreen();
   }
 }
