@@ -25,10 +25,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
   List<bool> _isExpandedList = [];
 
   Timer? _restTimer;
-  int _totalRestSeconds = 90; 
+  int _totalRestSeconds = 90;
   int _currentRestSeconds = 0;
   AnimationController? _progressController;
   late DateTime _startTime;
+  Timer? _elapsedTicker;
+
+  static const List<int> _restPresets = [60, 90, 120, 180];
 
   // Signatures de style GAIN - Or & Anthracite sobre unifié
   final Color bgColor = const Color(0xFF191919);
@@ -50,6 +53,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
     
     if (!widget.isEditing) {
       _restoreSessionState();
+      _elapsedTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
     }
 
     _isExpandedList = List.generate(widget.session.exercises.length, (index) => true);
@@ -58,12 +64,26 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
       vsync: this,
       duration: Duration(seconds: _totalRestSeconds),
     );
+
+    _loadDefaultRestSeconds();
+  }
+
+  Future<void> _loadDefaultRestSeconds() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getInt('gain_default_rest_seconds');
+    if (saved != null && mounted) {
+      setState(() {
+        _totalRestSeconds = saved;
+        _progressController?.duration = Duration(seconds: _totalRestSeconds);
+      });
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _restTimer?.cancel();
+    _elapsedTicker?.cancel();
     _progressController?.dispose();
     super.dispose();
   }
@@ -237,17 +257,19 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
     }
   }
 
-  void _startRestTimer() {
+  void _startRestTimer([int? presetSeconds]) {
     _restTimer?.cancel();
     setState(() {
+      if (presetSeconds != null) _totalRestSeconds = presetSeconds;
       _currentRestSeconds = _totalRestSeconds;
     });
 
     _progressController?.duration = Duration(seconds: _totalRestSeconds);
     _progressController?.reset();
-    _progressController!.forward(); 
+    _progressController!.forward();
 
     _saveSessionState();
+    if (presetSeconds != null) _saveDefaultRestSeconds(presetSeconds);
 
     _restTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_currentRestSeconds > 1) {
@@ -260,6 +282,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
         _showChronoDoneSnackbar();
       }
     });
+  }
+
+  Future<void> _saveDefaultRestSeconds(int seconds) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('gain_default_rest_seconds', seconds);
   }
 
   void _adjustRestTime(int amountSeconds) {
@@ -286,9 +313,10 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
   void _stopRestTimer() {
     _restTimer?.cancel();
     _progressController?.stop();
+    // 🕒 On conserve _totalRestSeconds (durée préférée) plutôt que de la réinitialiser,
+    // pour que le prochain repos reparte sur la même durée.
     setState(() {
       _currentRestSeconds = 0;
-      _totalRestSeconds = 90;
     });
     _clearSavedTimer();
   }
@@ -381,6 +409,16 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
       builder: (context) => Center(child: CircularProgressIndicator(color: accentGold, strokeWidth: 2)),
     );
 
+    int completedSets = 0;
+    double totalVolumeKg = 0;
+    for (var exercise in widget.session.exercises) {
+      for (var set in exercise.sets.where((s) => s.isCompleted)) {
+        completedSets++;
+        if (!exercise.isCardio) totalVolumeKg += set.weight * set.reps;
+      }
+    }
+    final sessionDurationMinutes = DateTime.now().difference(_startTime).inMinutes;
+
     try {
       await _saveWorkoutToSupabase();
       await _clearAllSessionState();
@@ -396,20 +434,17 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
       }
 
       if (mounted) {
-        Navigator.pop(context); 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text("Séance validée et enregistrée ! 💪", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
-            backgroundColor: const Color(0xFF1E211A),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: accentGold, width: 0.5)),
-          )
+        Navigator.pop(context); // ferme le loader
+        await _showSessionSummaryDialog(
+          completedSets: completedSets,
+          totalVolumeKg: totalVolumeKg,
+          durationMinutes: sessionDurationMinutes == 0 ? 1 : sessionDurationMinutes,
         );
-        Navigator.pop(context); 
+        if (mounted) Navigator.pop(context); // retour à la liste des programmes
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); 
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Erreur cloud : $e", style: const TextStyle(color: Colors.white)),
@@ -418,6 +453,62 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
         );
       }
     }
+  }
+
+  Future<void> _showSessionSummaryDialog({
+    required int completedSets,
+    required double totalVolumeKg,
+    required int durationMinutes,
+  }) {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.emoji_events_rounded, color: accentGold, size: 22),
+            const SizedBox(width: 10),
+            Text('Séance terminée', style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Inter')),
+          ],
+        ),
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _summaryStat('$durationMinutes min', 'Durée'),
+            _summaryStat('$completedSets', 'Séries'),
+            _summaryStat('${totalVolumeKg.round()} kg', 'Volume'),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentGold,
+                foregroundColor: bgColor,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Terminer', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryStat(String value, String label) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(value, style: TextStyle(color: accentGold, fontSize: 19, fontWeight: FontWeight.w900, fontFamily: 'Inter')),
+        const SizedBox(height: 4),
+        Text(label, style: TextStyle(color: textMuted, fontSize: 11, fontFamily: 'Inter')),
+      ],
+    );
   }
 
   void _showAddExerciseDialog() {
@@ -527,22 +618,24 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                     ),
 
                     if (!isCardioSelected) ...[
-                      TextField(controller: setsController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Séries", labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)))),
-                      TextField(controller: repsController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Répétitions", labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)))),
+                      TextField(controller: setsController, keyboardType: TextInputType.number, textInputAction: TextInputAction.next, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Séries", labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)))),
+                      TextField(controller: repsController, keyboardType: TextInputType.number, textInputAction: TextInputAction.done, onSubmitted: (_) => FocusScope.of(context).unfocus(), style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Répétitions", labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)))),
                       const SizedBox(height: 16),
                       TextField(
-                        controller: alternativeController, 
-                        style: TextStyle(color: textMain), 
+                        controller: alternativeController,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                        style: TextStyle(color: textMain),
                         decoration: InputDecoration(
-                          labelText: "Exercice secondaire (Optionnel)", 
+                          labelText: "Exercice secondaire (Optionnel)",
                           labelStyle: TextStyle(color: textMuted),
                           enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
                           focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
                         ),
                       ),
                     ] else ...[
-                      TextField(controller: durationController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Objectif Temps (min)", labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)))),
-                      TextField(controller: distanceController, keyboardType: TextInputType.number, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Objectif Distance (km)", labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)))),
+                      TextField(controller: durationController, keyboardType: TextInputType.number, textInputAction: TextInputAction.next, style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Objectif Temps (min)", labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)))),
+                      TextField(controller: distanceController, keyboardType: TextInputType.number, textInputAction: TextInputAction.done, onSubmitted: (_) => FocusScope.of(context).unfocus(), style: TextStyle(color: textMain), decoration: InputDecoration(labelText: "Objectif Distance (km)", labelStyle: TextStyle(color: textMuted), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)))),
                     ]
                   ],
                 ),
@@ -593,17 +686,85 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
     widget.onSessionUpdated();
   }
 
+  void _showRenameSessionDialog(WorkoutSession session) {
+    final controller = TextEditingController(text: session.name);
+
+    void submit() {
+      final trimmed = controller.text.trim();
+      if (trimmed.isNotEmpty) {
+        setState(() => session.name = trimmed);
+        widget.onSessionUpdated();
+      }
+      Navigator.pop(context);
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Renommer le programme', style: TextStyle(color: textMain, fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => submit(),
+          style: TextStyle(color: textMain, fontFamily: 'Inter'),
+          decoration: InputDecoration(
+            labelText: 'Nom du programme',
+            labelStyle: TextStyle(color: textMuted),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Annuler', style: TextStyle(color: textMuted))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: bgColor, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+            onPressed: submit,
+            child: const Text('Enregistrer', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final session = widget.session; 
+    final session = widget.session;
 
-    return Scaffold(
+    final int totalSetsCount = session.exercises.fold(0, (sum, e) => sum + e.sets.length);
+    final int completedSetsCount = session.exercises.fold(0, (sum, e) => sum + e.sets.where((s) => s.isCompleted).length);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
-        title: Text(
-          session.name.toUpperCase(), 
-          style: TextStyle(color: textMain, fontFamily: 'TheSeason', fontSize: 18, letterSpacing: 1.0)
-        ),
+        title: widget.isEditing
+            ? InkWell(
+                onTap: () => _showRenameSessionDialog(session),
+                borderRadius: BorderRadius.circular(8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        session.name.toUpperCase(),
+                        style: TextStyle(color: textMain, fontFamily: 'TheSeason', fontSize: 18, letterSpacing: 1.0),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(Icons.edit_rounded, size: 15, color: accentGold),
+                  ],
+                ),
+              )
+            : Text(
+                session.name.toUpperCase(),
+                style: TextStyle(color: textMain, fontFamily: 'TheSeason', fontSize: 18, letterSpacing: 1.0),
+              ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -611,6 +772,41 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
       ),
       body: Column(
         children: [
+          if (!widget.isEditing)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Row(
+                children: [
+                  Icon(Icons.timer_outlined, size: 14, color: textMuted),
+                  const SizedBox(width: 6),
+                  Text(
+                    _formatTime(DateTime.now().difference(_startTime).inSeconds),
+                    style: TextStyle(color: textMain, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Inter'),
+                  ),
+                  const SizedBox(width: 18),
+                  Icon(Icons.check_circle_outline_rounded, size: 14, color: textMuted),
+                  const SizedBox(width: 6),
+                  Text(
+                    '$completedSetsCount / $totalSetsCount séries',
+                    style: TextStyle(color: textMain, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Inter'),
+                  ),
+                  const Spacer(),
+                  if (totalSetsCount > 0)
+                    SizedBox(
+                      width: 70,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(2),
+                        child: LinearProgressIndicator(
+                          value: completedSetsCount / totalSetsCount,
+                          backgroundColor: cardColor,
+                          valueColor: AlwaysStoppedAnimation<Color>(accentGold),
+                          minHeight: 4,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           if (!widget.isEditing)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
@@ -802,10 +998,10 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                                   Text(
                                     allDone ? 'FAIT' : '$completedSets / $totalSets',
                                     style: TextStyle(
-                                      fontWeight: FontWeight.w900, 
+                                      fontWeight: FontWeight.w900,
                                       fontSize: 12,
                                       fontFamily: 'Inter',
-                                      color: allDone ? accentGold : Colors.orangeAccent.shade200
+                                      color: allDone ? accentGold : textMuted
                                     ),
                                   ),
                                 const SizedBox(width: 10),
@@ -891,16 +1087,23 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                                             Expanded(
                                               flex: 2,
                                               child: Container(
-                                                height: 36,
-                                                margin: const EdgeInsets.only(right: 12),
+                                                height: 38,
+                                                margin: const EdgeInsets.only(right: 10),
+                                                decoration: BoxDecoration(
+                                                  color: bgColor,
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                alignment: Alignment.center,
                                                 child: TextFormField(
                                                   initialValue: exercise.isCardio ? currentSet.duration.toString() : currentSet.reps.toString(),
                                                   keyboardType: TextInputType.number,
-                                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textMain, fontFamily: 'Inter'),
-                                                  decoration: InputDecoration(
+                                                  textAlign: TextAlign.center,
+                                                  textInputAction: TextInputAction.done,
+                                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textMain, fontFamily: 'Inter'),
+                                                  decoration: const InputDecoration(
                                                     border: InputBorder.none,
-                                                    enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
-                                                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
+                                                    isDense: true,
+                                                    contentPadding: EdgeInsets.symmetric(vertical: 8),
                                                   ),
                                                   onChanged: (val) {
                                                     if (exercise.isCardio) {
@@ -910,22 +1113,30 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                                                     }
                                                     widget.onSessionUpdated();
                                                   },
+                                                  onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
                                                 ),
                                               ),
                                             ),
                                             Expanded(
                                               flex: 2,
                                               child: Container(
-                                                height: 36,
-                                                margin: const EdgeInsets.only(right: 12),
+                                                height: 38,
+                                                margin: const EdgeInsets.only(right: 10),
+                                                decoration: BoxDecoration(
+                                                  color: bgColor,
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                alignment: Alignment.center,
                                                 child: TextFormField(
                                                   initialValue: exercise.isCardio ? currentSet.distance.toString() : currentSet.weight.toString(),
                                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textMain, fontFamily: 'Inter'),
-                                                  decoration: InputDecoration(
+                                                  textAlign: TextAlign.center,
+                                                  textInputAction: TextInputAction.done,
+                                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textMain, fontFamily: 'Inter'),
+                                                  decoration: const InputDecoration(
                                                     border: InputBorder.none,
-                                                    enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
-                                                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
+                                                    isDense: true,
+                                                    contentPadding: EdgeInsets.symmetric(vertical: 8),
                                                   ),
                                                   onChanged: (val) {
                                                     if (exercise.isCardio) {
@@ -935,6 +1146,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                                                     }
                                                     widget.onSessionUpdated();
                                                   },
+                                                  onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
                                                 ),
                                               ),
                                             ),
@@ -1041,7 +1253,10 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
               builder: (context, child) {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  color: const Color(0xFF161A20), 
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    border: Border(top: BorderSide(color: Colors.grey.shade900)),
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1070,6 +1285,35 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
                             constraints: const BoxConstraints(),
                             onPressed: _stopRestTimer,
                           )
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          for (final preset in _restPresets) ...[
+                            InkWell(
+                              onTap: () => _startRestTimer(preset),
+                              borderRadius: BorderRadius.circular(6),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: _totalRestSeconds == preset ? accentGold.withValues(alpha: 0.15) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: _totalRestSeconds == preset ? accentGold.withValues(alpha: 0.4) : Colors.grey.shade800),
+                                ),
+                                child: Text(
+                                  "${preset}s",
+                                  style: TextStyle(
+                                    color: _totalRestSeconds == preset ? accentGold : textMuted,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'Inter',
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -1111,18 +1355,20 @@ class _WorkoutScreenState extends State<WorkoutScreen> with TickerProviderStateM
               child: SizedBox(
                 width: double.infinity,
                 height: 54,
-                child: OutlinedButton(
+                child: ElevatedButton(
                   onPressed: _finishWorkout,
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E211A), 
-                    side: BorderSide(color: accentGold.withValues(alpha:0.5), width: 0.8),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentGold,
+                    foregroundColor: bgColor,
+                    elevation: 0,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
-                  child: const Text('TERMINER LA SÉANCE', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1.0, fontFamily: 'Inter')),
+                  child: const Text('TERMINER LA SÉANCE', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 1.0, fontFamily: 'Inter')),
                 ),
               ),
             ),
         ],
+      ),
       ),
     );
   }

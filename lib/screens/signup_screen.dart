@@ -94,8 +94,9 @@ Future<void> _handleSocialSignIn(OAuthProvider provider) async {
   try {
     await _supabase.auth.signInWithOAuth(
       provider,
-      // 💡 ALIGNEMENT : On utilise le protocole d'écoute configuré dans l'Info.plist
-      redirectTo: 'liftlog://callback', 
+      // 💡 ALIGNEMENT : même redirect URI que login_screen.dart, whitelistée dans Supabase
+      redirectTo: 'liftlog://login-callback',
+      authScreenLaunchMode: LaunchMode.externalApplication,
     );
   } on AuthException catch (e) {
     if (!context.mounted) return; 

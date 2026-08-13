@@ -262,9 +262,14 @@ class _KcalTabState extends State<KcalTab> {
                   'target_lipids': int.tryParse(lipidsController.text) ?? 80,
                 });
                 if (context.mounted) Navigator.pop(context);
-                await _loadSupabaseTargets(); 
+                await _loadSupabaseTargets();
               } catch (e) {
                 debugPrint("Erreur sauvegarde manuelle : $e");
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Erreur lors de la sauvegarde des objectifs'), backgroundColor: Colors.redAccent),
+                  );
+                }
               }
             },
             child: const Text("Enregistrer", style: TextStyle(fontWeight: FontWeight.bold)),

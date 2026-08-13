@@ -258,6 +258,11 @@ class _EvolutionTabState extends State<EvolutionTab> with SingleTickerProviderSt
     } catch (e) {
       debugPrint("Erreur upload photo : $e");
       setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur lors de l\'envoi de la photo'), backgroundColor: Colors.redAccent),
+        );
+      }
     }
   }
 

@@ -64,15 +64,23 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> signInWithApple() async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.apple,
         redirectTo: 'liftlog://login-callback',
         authScreenLaunchMode: LaunchMode.externalApplication,
       );
-      debugPrint("🔥 Connexion Apple lancée");
+    } on AuthException catch (e) {
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
+      );
     } catch (e) {
-      debugPrint("❌ Erreur Connexion Apple : $e");
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Une erreur inattendue est survenue'), backgroundColor: Colors.redAccent),
+      );
     }
   }
 

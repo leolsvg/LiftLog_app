@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/workout_model.dart';
@@ -24,13 +25,55 @@ class _HomeScreenState extends State<HomeScreen> {
   List<WorkoutSession> _allSessions = [];
   bool _isLoading = true;
 
-  final int _selectedSessionIndex = 0;
+  int _selectedSessionIndex = 0;
   int _currentTabRowIndex = 1; // Par défaut sur le Dashboard (Accueil)
+
+  Timer? _syncDebounce;
+  Map<String, DateTime> _lastPerformedByName = {};
 
   @override
   void initState() {
     super.initState();
     _loadSavedSessions();
+    _loadLastPerformedDates();
+  }
+
+  @override
+  void dispose() {
+    _syncDebounce?.cancel();
+    super.dispose();
+  }
+
+  // 🕒 Évite d'envoyer une requête delete+insert à Supabase à chaque frappe clavier :
+  // on regroupe les modifications rapprochées en une seule synchronisation.
+  void _debouncedSync() {
+    _syncDebounce?.cancel();
+    _syncDebounce = Timer(const Duration(milliseconds: 800), _syncSessionsToSupabase);
+  }
+
+  Future<void> _loadLastPerformedDates() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final List<dynamic> data = await Supabase.instance.client
+          .from('workouts')
+          .select('name, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', ascending: false);
+
+      final Map<String, DateTime> lastPerformed = {};
+      for (var row in data) {
+        final name = row['name'] as String?;
+        if (name == null || lastPerformed.containsKey(name)) continue;
+        final createdAt = DateTime.tryParse(row['created_at'] ?? '');
+        if (createdAt != null) lastPerformed[name] = createdAt;
+      }
+
+      if (mounted) setState(() => _lastPerformedByName = lastPerformed);
+    } catch (e) {
+      debugPrint("Erreur chargement dernières séances : $e");
+    }
   }
 
   Future<void> _loadSavedSessions() async {
@@ -116,6 +159,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showCreateSessionDialog() {
     final titleController = TextEditingController();
+    void submit() async {
+      if (titleController.text.trim().isNotEmpty) {
+        setState(() => _allSessions.add(WorkoutSession(name: titleController.text.trim(), exercises: [])));
+        Navigator.pop(context);
+        await _syncSessionsToSupabase();
+      }
+    }
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -123,10 +173,13 @@ class _HomeScreenState extends State<HomeScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Créer une séance', style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Inter')),
         content: TextField(
-          controller: titleController, 
+          controller: titleController,
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => submit(),
           style: TextStyle(color: textMain, fontFamily: 'Inter'),
           decoration: InputDecoration(
-            labelText: "Nom de l'entraînement", 
+            labelText: "Nom de l'entraînement",
             labelStyle: TextStyle(color: textMuted),
             enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
             focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accentGold)),
@@ -135,13 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: Text('Annuler', style: TextStyle(color: textMuted, fontFamily: 'Inter'))),
           ElevatedButton(
-            onPressed: () async {
-              if (titleController.text.isNotEmpty) {
-                setState(() => _allSessions.add(WorkoutSession(name: titleController.text, exercises: [])));
-                Navigator.pop(context);
-                await _syncSessionsToSupabase();
-              }
-            },
+            onPressed: submit,
             style: ElevatedButton.styleFrom(backgroundColor: accentGold, foregroundColor: bgColor, elevation: 0),
             child: const Text('Créer', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Inter')),
           )
@@ -154,23 +201,47 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) return Scaffold(backgroundColor: bgColor, body: Center(child: CircularProgressIndicator(color: accentGold, strokeWidth: 2)));
 
+    // La sélection de séance peut se décaler si des programmes sont ajoutés/supprimés entre deux builds.
+    if (_selectedSessionIndex >= _allSessions.length) {
+      _selectedSessionIndex = _allSessions.isEmpty ? 0 : _allSessions.length - 1;
+    }
+
     final List<Widget> tabs = [
       SessionsTab(
         sessions: _allSessions,
-        onLaunchSession: (s) => Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutScreen(session: s, onSessionUpdated: _syncSessionsToSupabase))),
-        onEditSession: (s) => Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutScreen(session: s, onSessionUpdated: _syncSessionsToSupabase, isEditing: true))),
+        lastPerformedByName: _lastPerformedByName,
+        // 🧬 On lance une COPIE indépendante du programme : les modifications faites pendant une
+        // séance live (séries cochées, poids/reps réellement effectués) ne doivent jamais réécrire
+        // le programme réutilisable (voir onEditSession pour la vraie édition du programme).
+        onLaunchSession: (s) => Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutScreen(session: WorkoutSession.fromJson(s.toJson()), onSessionUpdated: () {}))).then((_) => _loadLastPerformedDates()),
+        onEditSession: (s) => Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutScreen(session: s, onSessionUpdated: _debouncedSync, isEditing: true))),
         onDeleteSession: _deleteSessionDialog,
-        onCreateSession: _showCreateSessionDialog, onReorderSessions: (int oldIndex, int newIndex) {  },
+        onCreateSession: _showCreateSessionDialog,
+        onReorderSessions: (int oldIndex, int newIndex) {
+          setState(() {
+            if (newIndex > oldIndex) newIndex -= 1;
+            final session = _allSessions.removeAt(oldIndex);
+            _allSessions.insert(newIndex, session);
+            if (_selectedSessionIndex == oldIndex) {
+              _selectedSessionIndex = newIndex;
+            }
+          });
+          _syncSessionsToSupabase();
+        },
       ),
       DashboardTab(
-        nextSessionName: _allSessions.isNotEmpty ? _allSessions[_selectedSessionIndex].name : "Aucune",
+        sessionNames: _allSessions.map((s) => s.name).toList(),
+        selectedSessionIndex: _selectedSessionIndex,
+        onSelectSession: (index) => setState(() => _selectedSessionIndex = index),
         onStartSession: () {
            if (_allSessions.isNotEmpty) {
-             Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutScreen(session: _allSessions[_selectedSessionIndex], onSessionUpdated: _syncSessionsToSupabase)));
+             final liveSession = WorkoutSession.fromJson(_allSessions[_selectedSessionIndex].toJson());
+             Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutScreen(session: liveSession, onSessionUpdated: () {})))
+                 .then((_) => _loadLastPerformedDates());
            }
         },
       ),
-      const EvolutionTab(), 
+      const EvolutionTab(),
     ];
 
     return Scaffold(

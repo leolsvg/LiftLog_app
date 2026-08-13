@@ -8,8 +8,10 @@ class SessionsTab extends StatelessWidget {
   final Function(WorkoutSession) onEditSession;
   final Function(int) onDeleteSession;
   final VoidCallback onCreateSession;
-  // 🖐️ NOUVEAU : Callback pour enregistrer le réordonnancement
+  // 🖐️ Callback pour enregistrer le réordonnancement
   final Function(int oldIndex, int newIndex) onReorderSessions;
+  // 📅 Date de la dernière séance effectuée, par nom de programme
+  final Map<String, DateTime> lastPerformedByName;
 
   const SessionsTab({
     super.key,
@@ -19,7 +21,20 @@ class SessionsTab extends StatelessWidget {
     required this.onDeleteSession,
     required this.onCreateSession,
     required this.onReorderSessions,
+    this.lastPerformedByName = const {},
   });
+
+  String _formatLastPerformed(DateTime? date) {
+    if (date == null) return 'Jamais effectuée';
+    final days = DateTime.now().difference(date).inDays;
+    if (days <= 0) return "Aujourd'hui";
+    if (days == 1) return 'Hier';
+    if (days < 7) return 'Il y a $days jours';
+    final weeks = days ~/ 7;
+    if (weeks < 5) return weeks == 1 ? 'Il y a 1 semaine' : 'Il y a $weeks semaines';
+    final months = days ~/ 30;
+    return months <= 1 ? 'Il y a 1 mois' : 'Il y a $months mois';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -160,6 +175,21 @@ class SessionsTab extends StatelessWidget {
                                               fontSize: 12,
                                               fontFamily: 'Inter',
                                             ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Row(
+                                            children: [
+                                              Icon(Icons.history_rounded, size: 11, color: textMuted.withValues(alpha: 0.6)),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                _formatLastPerformed(lastPerformedByName[session.name]),
+                                                style: TextStyle(
+                                                  color: textMuted.withValues(alpha: 0.7),
+                                                  fontSize: 11,
+                                                  fontFamily: 'Inter',
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ],
                                       ),

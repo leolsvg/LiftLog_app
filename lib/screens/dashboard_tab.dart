@@ -5,13 +5,17 @@ import '../widgets/consistency_tracker.dart';
 import 'account_screen.dart';
 
 class DashboardTab extends StatefulWidget {
-  final String nextSessionName;
+  final List<String> sessionNames;
+  final int selectedSessionIndex;
   final VoidCallback onStartSession;
+  final ValueChanged<int> onSelectSession;
 
   const DashboardTab({
     super.key,
-    required this.nextSessionName,
+    required this.sessionNames,
+    required this.selectedSessionIndex,
     required this.onStartSession,
+    required this.onSelectSession,
   });
 
   @override
@@ -140,14 +144,28 @@ class _DashboardTabState extends State<DashboardTab> {
     }
   }
 
+  String get _nextSessionName =>
+      widget.sessionNames.isEmpty ? '' : widget.sessionNames[widget.selectedSessionIndex.clamp(0, widget.sessionNames.length - 1)];
+
+  @override
+  void didUpdateWidget(covariant DashboardTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldName = oldWidget.sessionNames.isEmpty
+        ? ''
+        : oldWidget.sessionNames[oldWidget.selectedSessionIndex.clamp(0, oldWidget.sessionNames.length - 1)];
+    if (oldName != _nextSessionName) {
+      _fetchSessionAverageDuration();
+    }
+  }
+
   Future<void> _fetchSessionAverageDuration() async {
-    if (user == null || widget.nextSessionName.isEmpty) return;
+    if (user == null || _nextSessionName.isEmpty) return;
     try {
       final response = await supabase
           .from('workouts')
           .select('duration_minutes')
           .eq('user_id', user!.id)
-          .eq('name', widget.nextSessionName);
+          .eq('name', _nextSessionName);
       final List<dynamic> data = response as List<dynamic>;
 
       if (data.isNotEmpty) {
@@ -197,6 +215,11 @@ class _DashboardTabState extends State<DashboardTab> {
       _loadAllData();
     } catch (e) {
       debugPrint("Erreur sauvegarde poids : $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur lors de la sauvegarde du poids'), backgroundColor: Colors.redAccent),
+        );
+      }
     }
   }
 
@@ -295,15 +318,18 @@ class _DashboardTabState extends State<DashboardTab> {
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: accentGold.withValues(alpha:0.15), width: 1),
                         ),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                           children: [
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('PROCHAINE SÉANCE', style: TextStyle(color: textMuted, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0, fontFamily: 'Inter')), 
-                                  const SizedBox(height: 6), 
-                                  Text(widget.nextSessionName.isEmpty ? "Aucune de planifiée" : widget.nextSessionName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textMain, fontFamily: 'Inter')),
+                                  Text('PROCHAINE SÉANCE', style: TextStyle(color: textMuted, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0, fontFamily: 'Inter')),
+                                  const SizedBox(height: 6),
+                                  Text(_nextSessionName.isEmpty ? "Aucune de planifiée" : _nextSessionName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textMain, fontFamily: 'Inter')),
                                   const SizedBox(height: 8),
                                   Row(
                                     children: [
@@ -317,9 +343,9 @@ class _DashboardTabState extends State<DashboardTab> {
                             ),
                             const SizedBox(width: 12),
                             ElevatedButton(
-                              onPressed: widget.onStartSession, 
+                              onPressed: widget.onStartSession,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: accentGold, 
+                                backgroundColor: accentGold,
                                 foregroundColor: bgColor,
                                 elevation: 0,
                                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
@@ -327,6 +353,33 @@ class _DashboardTabState extends State<DashboardTab> {
                               ), 
                               child: const Text('Lancer', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, fontFamily: 'Inter')),
                             ),
+                          ],
+                            ),
+                            if (widget.sessionNames.length > 1) ...[
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                height: 30,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: widget.sessionNames.length,
+                                  separatorBuilder: (_, __) => const SizedBox(width: 6),
+                                  itemBuilder: (context, i) {
+                                    final selected = i == widget.selectedSessionIndex;
+                                    return ChoiceChip(
+                                      label: Text(widget.sessionNames[i]),
+                                      selected: selected,
+                                      onSelected: (_) => widget.onSelectSession(i),
+                                      selectedColor: accentGold.withValues(alpha: 0.18),
+                                      backgroundColor: bgColor,
+                                      labelStyle: TextStyle(color: selected ? accentGold : textMuted, fontWeight: FontWeight.bold, fontSize: 11, fontFamily: 'Inter'),
+                                      shape: StadiumBorder(side: BorderSide(color: selected ? accentGold.withValues(alpha: 0.5) : Colors.grey.shade900)),
+                                      visualDensity: VisualDensity.compact,
+                                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
