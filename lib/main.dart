@@ -8,6 +8,18 @@ import 'package:intl/date_symbol_data_local.dart';
 
 StreamSubscription<Uri>? _oauthLinkSubscription;
 
+// 🔑 Permet d'afficher un feedback utilisateur (SnackBar) depuis en dehors de l'arbre de widgets,
+// notamment quand le retour du deep link OAuth (Apple/Google) échoue silencieusement.
+final navigatorKey = GlobalKey<NavigatorState>();
+
+void _showOAuthErrorFeedback(String message) {
+  final context = navigatorKey.currentContext;
+  if (context == null || !context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
+  );
+}
+
 Future<void> _handleOAuthDeepLink() async {
   final appLinks = AppLinks();
 
@@ -25,6 +37,7 @@ Future<void> _handleOAuthDeepLink() async {
       await Supabase.instance.client.auth.getSessionFromUrl(uri);
     } catch (e) {
       debugPrint('❌ Erreur de traitement du deep link OAuth en temps réel : $e');
+      _showOAuthErrorFeedback('La connexion a échoué, réessaie.');
     }
   });
 }
@@ -54,6 +67,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'GAIN',
       theme: ThemeData(

@@ -42,10 +42,6 @@
 	
 	<key>NSCameraUsageDescription</key>
 	<string>La caméra est nécessaire pour scanner les codes-barres des aliments.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>GAIN a besoin d'accéder à votre galerie pour vous permettre de choisir une photo de profil ou d'illustrer vos exercices.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>GAIN utilise la localisation uniquement si nécessaire pour les fonctionnalités de l'application.</string>
 
 	<key>UIApplicationSceneManifest</key>
 	<dict>

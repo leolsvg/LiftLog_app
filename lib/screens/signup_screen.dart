@@ -99,9 +99,14 @@ Future<void> _handleSocialSignIn(OAuthProvider provider) async {
       authScreenLaunchMode: LaunchMode.externalApplication,
     );
   } on AuthException catch (e) {
-    if (!context.mounted) return; 
+    if (!context.mounted) return;
     messenger.showSnackBar(
       SnackBar(content: Text(e.message), backgroundColor: Colors.redAccent),
+    );
+  } catch (e) {
+    if (!context.mounted) return;
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Une erreur inattendue est survenue'), backgroundColor: Colors.redAccent),
     );
   }
 }

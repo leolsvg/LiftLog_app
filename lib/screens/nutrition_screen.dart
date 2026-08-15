@@ -192,6 +192,11 @@ class _NutritionScreenState extends State<NutritionScreen> {
       }
     } catch (e) {
       debugPrint("Erreur ajout macros : $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Erreur lors de la mise à jour de la nutrition"), backgroundColor: Colors.redAccent),
+        );
+      }
     }
   }
 
@@ -437,21 +442,28 @@ class _NutritionScreenState extends State<NutritionScreen> {
                     if (user == null || mealNameController.text.trim().isEmpty || tempIngredients.isEmpty) return;
 
                     final navigator = Navigator.of(context);
+                    final messenger = ScaffoldMessenger.of(context);
 
                     final meal = CustomMeal(
-                      name: mealNameController.text.trim(), 
-                      kcal: totalKcal, 
-                      prot: totalProt, 
-                      carbs: totalCarbs, 
+                      name: mealNameController.text.trim(),
+                      kcal: totalKcal,
+                      prot: totalProt,
+                      carbs: totalCarbs,
                       lipids: totalLipids,
                     );
-                    
-                    await _supabase.from('custom_meals').insert(meal.toMap(user.id));
-                    
-                    if (!context.mounted) return;
 
-                    navigator.pop();
-                    _loadAllData();
+                    try {
+                      await _supabase.from('custom_meals').insert(meal.toMap(user.id));
+                      if (!context.mounted) return;
+                      navigator.pop();
+                      _loadAllData();
+                    } catch (e) {
+                      debugPrint("Erreur enregistrement plat : $e");
+                      if (!context.mounted) return;
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text("Erreur lors de l'enregistrement du plat"), backgroundColor: Colors.redAccent),
+                      );
+                    }
                   },
                   child: const Text("Enregistrer le plat", style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                 )
@@ -496,19 +508,29 @@ class _NutritionScreenState extends State<NutritionScreen> {
               final user = _supabase.auth.currentUser;
               if (user == null || nameController.text.trim().isEmpty) return;
 
-              await _supabase.from('food_catalog').insert({
-                'user_id': user.id,
-                'name': nameController.text.trim(),
-                'kcal_per_100g': int.tryParse(kcalController.text) ?? 0,
-                'prot_per_100g': int.tryParse(protController.text) ?? 0,
-                'carbs_per_100g': int.tryParse(carbsController.text) ?? 0,
-                'lipids_per_100g': int.tryParse(lipidsController.text) ?? 0,
-              });
+              final navigator = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
 
-              if (!context.mounted) return;
+              try {
+                await _supabase.from('food_catalog').insert({
+                  'user_id': user.id,
+                  'name': nameController.text.trim(),
+                  'kcal_per_100g': int.tryParse(kcalController.text) ?? 0,
+                  'prot_per_100g': int.tryParse(protController.text) ?? 0,
+                  'carbs_per_100g': int.tryParse(carbsController.text) ?? 0,
+                  'lipids_per_100g': int.tryParse(lipidsController.text) ?? 0,
+                });
 
-              Navigator.pop(context);
-              _loadAllData();
+                if (!context.mounted) return;
+                navigator.pop();
+                _loadAllData();
+              } catch (e) {
+                debugPrint("Erreur enregistrement ingrédient : $e");
+                if (!context.mounted) return;
+                messenger.showSnackBar(
+                  const SnackBar(content: Text("Erreur lors de l'enregistrement de l'ingrédient"), backgroundColor: Colors.redAccent),
+                );
+              }
             },
             child: const Text("Enregistrer", style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Inter')),
           )

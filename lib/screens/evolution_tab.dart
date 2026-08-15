@@ -1,6 +1,4 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'kcal_tab.dart';
@@ -18,7 +16,6 @@ class _EvolutionTabState extends State<EvolutionTab> with SingleTickerProviderSt
   bool _isLoading = true;
 
   List<dynamic> _measurements = [];
-  List<dynamic> _photos = [];
 
   // --- Palette de couleurs GAIN (Or & Anthracite) ---
   final Color bgColor = const Color(0xFF191919);
@@ -30,7 +27,7 @@ class _EvolutionTabState extends State<EvolutionTab> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _loadEvolutionData();
   }
 
@@ -52,15 +49,8 @@ class _EvolutionTabState extends State<EvolutionTab> with SingleTickerProviderSt
           .eq('user_id', user.id)
           .order('date', ascending: false);
 
-      final photosData = await _supabase
-          .from('user_progress_photos')
-          .select()
-          .eq('user_id', user.id)
-          .order('date', ascending: false);
-
       setState(() {
         _measurements = measurementsData;
-        _photos = photosData;
         _isLoading = false;
       });
     } catch (e) {
@@ -232,48 +222,6 @@ class _EvolutionTabState extends State<EvolutionTab> with SingleTickerProviderSt
     );
   }
 
-  Future<void> _pickAndUploadPhoto() async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return;
-
-    final picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
-
-    if (image == null) return;
-    setState(() => _isLoading = true);
-
-    try {
-      final file = File(image.path);
-      final fileName = '${user.id}/${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-      await _supabase.storage.from('progress-photos').upload(fileName, file);
-
-      await _supabase.from('user_progress_photos').insert({
-        'user_id': user.id,
-        'storage_path': fileName,
-        'type': 'Global',
-      });
-
-      _loadEvolutionData();
-    } catch (e) {
-      debugPrint("Erreur upload photo : $e");
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erreur lors de l\'envoi de la photo'), backgroundColor: Colors.redAccent),
-        );
-      }
-    }
-  }
-
-  Future<String> _getSignedUrl(String path) async {
-    try {
-      return await _supabase.storage.from('progress-photos').createSignedUrl(path, 3600);
-    } catch (e) {
-      return '';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -292,7 +240,6 @@ class _EvolutionTabState extends State<EvolutionTab> with SingleTickerProviderSt
               tabs: const [
                 Tab(icon: Icon(Icons.local_fire_department_outlined, size: 22)),
                 Tab(icon: Icon(Icons.straighten, size: 22)),
-                Tab(icon: Icon(Icons.camera_alt_outlined, size: 22)),
               ],
             ),
           ),
@@ -305,7 +252,6 @@ class _EvolutionTabState extends State<EvolutionTab> with SingleTickerProviderSt
               children: [
                 const KcalTab(),
                 _buildMeasurementsTab(),
-                _buildPhotosTab(),
               ],
             ),
     );
@@ -389,134 +335,4 @@ class _EvolutionTabState extends State<EvolutionTab> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildPhotosTab() {
-    if (_photos.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.camera_alt_outlined, size: 32, color: textMuted.withValues(alpha:0.3)),
-            const SizedBox(height: 12),
-            Text("Aucune photo", style: TextStyle(color: textMuted, fontSize: 13, fontFamily: 'Inter')),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: cardColor, foregroundColor: accentGold, elevation: 0),
-              onPressed: _pickAndUploadPhoto, 
-              icon: const Icon(Icons.add_a_photo, size: 16), 
-              label: const Text("Prendre une photo", style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold))
-            ),
-          ],
-        ),
-      );
-    }
-
-    Map<String, List<dynamic>> groupedPhotos = {};
-    for (var photo in _photos) {
-      if (photo['date'] == null) continue;
-      final DateTime rawDate = DateTime.parse(photo['date']);
-      final String monthKey = DateFormat('MMMM yyyy', 'fr_FR').format(rawDate);
-      
-      if (!groupedPhotos.containsKey(monthKey)) {
-        groupedPhotos[monthKey] = [];
-      }
-      groupedPhotos[monthKey]!.add(photo);
-    }
-
-    return Scaffold(
-      backgroundColor: bgColor,
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: accentGold,
-        foregroundColor: bgColor,
-        elevation: 2,
-        onPressed: _pickAndUploadPhoto,
-        child: const Icon(Icons.add_a_photo),
-      ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: groupedPhotos.keys.length,
-        itemBuilder: (context, index) {
-          String monthTitle = groupedPhotos.keys.elementAt(index);
-          List<dynamic> photosInMonth = groupedPhotos[monthTitle]!;
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0, bottom: 12.0, left: 2.0),
-                child: Text(
-                  monthTitle.toUpperCase(),
-                  style: TextStyle(
-                    color: accentGold,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.2,
-                    fontFamily: 'Inter',
-                  ),
-                ),
-              ),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(), 
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 0.85,
-                ),
-                itemCount: photosInMonth.length,
-                itemBuilder: (context, pIndex) {
-                  final photo = photosInMonth[pIndex];
-                  final DateTime photoDate = DateTime.parse(photo['date'] ?? DateTime.now().toIso8601String());
-                  final String displayDay = DateFormat('dd MMM', 'fr_FR').format(photoDate);
-
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: cardColor, 
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          FutureBuilder<String>(
-                            future: _getSignedUrl(photo['storage_path']),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return Center(child: CircularProgressIndicator(color: accentGold, strokeWidth: 1.5));
-                              }
-                              if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                                return Image.network(snapshot.data!, fit: BoxFit.cover);
-                              }
-                              return Icon(Icons.broken_image, color: textMuted);
-                            },
-                          ),
-                          Positioned(
-                            top: 8,
-                            left: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha:0.6),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                displayDay,
-                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'Inter'),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 16), 
-            ],
-          );
-        },
-      ),
-    );
-  }
 }

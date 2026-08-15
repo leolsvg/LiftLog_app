@@ -427,6 +427,57 @@ class _AccountScreenState extends State<AccountScreen> {
     }
   }
 
+  void _handleDeleteAccount() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text("Supprimer ton compte ?", style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Inter')),
+        content: Text(
+          "Cette action est définitive : toutes tes séances, programmes, mensurations et données de compte seront supprimés. Impossible de revenir en arrière.",
+          style: TextStyle(color: textMuted, fontSize: 14, fontFamily: 'Inter'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Annuler", style: TextStyle(color: textMuted, fontFamily: 'Inter')),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red[900], foregroundColor: Colors.white, elevation: 0),
+            onPressed: () {
+              Navigator.pop(context);
+              _confirmDeleteAccount();
+            },
+            child: const Text("Supprimer définitivement", style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Inter')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    setState(() => _isLoading = true);
+    try {
+      await _supabase.rpc('delete_own_account');
+      await _supabase.auth.signOut();
+
+      if (!context.mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erreur lors de la suppression : $e", style: const TextStyle(fontFamily: 'Inter')), backgroundColor: Colors.redAccent),
+        );
+      }
+    }
+  }
+
   Future<void> _handleSignOut() async {
     showDialog(
       context: context,
@@ -750,13 +801,40 @@ class _AccountScreenState extends State<AccountScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  InkWell(
+                    onTap: _handleDeleteAccount,
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: cardColor,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.15), width: 1)
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.delete_forever_rounded, color: Colors.redAccent, size: 20),
+                              const SizedBox(width: 12),
+                              Text("Supprimer mon compte", style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
+                            ],
+                          ),
+                          const Icon(Icons.chevron_right_rounded, color: Colors.redAccent, size: 18),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 40),
 
                   // --- METADATA APP ---
                   Center(
                     child: Column(
                       children: [
-                        Text("GAIN v1.1.0", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
+                        Text("GAIN v1.2.2", style: TextStyle(color: textMuted, fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Inter')),
                         const SizedBox(height: 4),
                         Text(
                           "Conçu pour l'esthétique et la performance.", 
